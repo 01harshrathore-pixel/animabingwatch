@@ -325,6 +325,55 @@ app.post('/api/admin/protected/track-ad-click', adminAuth, async (req, res) => {
 // ✅ PROTECTED ADMIN ROUTES
 app.use('/api/admin/protected', adminAuth, adminRoutes);
 
+// ✅ ADD MISSING ROUTES - YEH ADD KARO
+app.get('/api/app-downloads', async (req, res) => {
+  try {
+    console.log('📱 Fetching app downloads...');
+    // Temporary empty response
+    res.json([]);
+  } catch (error) {
+    console.error('App downloads error:', error);
+    res.json([]);
+  }
+});
+
+app.get('/api/social', async (req, res) => {
+  try {
+    console.log('🔗 Fetching social links...');
+    // Temporary default social links
+    res.json([
+      {
+        platform: 'facebook',
+        url: '#',
+        isActive: false
+      },
+      {
+        platform: 'twitter', 
+        url: '#', 
+        isActive: false
+      },
+      {
+        platform: 'instagram',
+        url: '#', 
+        isActive: false
+      },
+      {
+        platform: 'telegram',
+        url: '#',
+        isActive: false  
+      },
+      {
+        platform: 'discord',
+        url: '#',
+        isActive: false
+      }
+    ]);
+  } catch (error) {
+    console.error('Social links error:', error);
+    res.json([]);
+  }
+});
+
 // ✅ PUBLIC ROUTES
 app.use('/api/anime', animeRoutes);
 app.use('/api/episodes', episodeRoutes);
