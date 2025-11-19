@@ -1,4 +1,4 @@
- // src/components/admin/EpisodesManager.tsx - UPDATED WITH EDIT FUNCTIONALITY
+  // src/components/admin/EpisodesManager.tsx - UPDATED WITHOUT CUTYLINK FIELD
 import React, { useState, useEffect } from 'react';
 import type { Anime, Episode, Chapter } from '../../types';
 import axios from 'axios';
@@ -16,7 +16,6 @@ const EpisodesManager: React.FC = () => {
   const [newItem, setNewItem] = useState({
     number: 1,
     title: '',
-    cutyLink: '',
     session: 1
   });
   const [loading, setLoading] = useState(true);
@@ -100,19 +99,18 @@ const EpisodesManager: React.FC = () => {
     }
   };
 
-  // ✅ NEW: Handle Edit Item
+  // Handle Edit Item
   const handleEditItem = (item: Episode | Chapter) => {
     setEditingItem(item);
     setIsEditing(true);
     setNewItem({
       number: isManga ? (item as Chapter).chapterNumber : (item as Episode).episodeNumber,
       title: item.title || '',
-      cutyLink: item.cutyLink,
       session: item.session || 1
     });
   };
 
-  // ✅ NEW: Cancel Edit
+  // Cancel Edit
   const handleCancelEdit = () => {
     setIsEditing(false);
     setEditingItem(null);
@@ -120,19 +118,18 @@ const EpisodesManager: React.FC = () => {
     setNewItem({
       number: nextNumber,
       title: '',
-      cutyLink: '',
       session: selectedSession
     });
   };
 
-  // ✅ NEW: Get next available number
+  // Get next available number
   const getNextAvailableNumber = () => {
     if (filteredItems.length === 0) return 1;
     const numbers = filteredItems.map(item => isManga ? (item as Chapter).chapterNumber : (item as Episode).episodeNumber);
     return Math.max(...numbers) + 1;
   };
 
-  // ✅ UPDATED: Add/Edit Item Function
+  // Add/Edit Item Function
   const handleSubmitItem = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedAnime) {
@@ -164,14 +161,12 @@ const EpisodesManager: React.FC = () => {
           mangaId: selectedAnime.id,
           chapterNumber: newItem.number,
           title: newItem.title || `Chapter ${newItem.number}`,
-          cutyLink: newItem.cutyLink,
           session: newItem.session
         }
       : {
           animeId: selectedAnime.id,
           episodeNumber: newItem.number,
           title: newItem.title || `Episode ${newItem.number}`,
-          cutyLink: newItem.cutyLink,
           session: newItem.session
         };
 
@@ -187,7 +182,7 @@ const EpisodesManager: React.FC = () => {
     fetchContent(selectedAnime.id);
   };
 
-  // ✅ NEW: Update Item Function
+  // Update Item Function
   const handleUpdateItem = async () => {
     if (!editingItem) return;
 
@@ -197,14 +192,12 @@ const EpisodesManager: React.FC = () => {
           mangaId: selectedAnime.id,
           chapterNumber: (editingItem as Chapter).chapterNumber, // Original number for lookup
           title: newItem.title || `Chapter ${newItem.number}`,
-          cutyLink: newItem.cutyLink,
           session: newItem.session
         }
       : {
           animeId: selectedAnime.id,
           episodeNumber: (editingItem as Episode).episodeNumber, // Original number for lookup
           title: newItem.title || `Episode ${newItem.number}`,
-          cutyLink: newItem.cutyLink,
           session: newItem.session
         };
 
@@ -220,7 +213,7 @@ const EpisodesManager: React.FC = () => {
     fetchContent(selectedAnime.id);
   };
 
-  // ✅ NEW: Reset form
+  // Reset form
   const resetForm = () => {
     setIsEditing(false);
     setEditingItem(null);
@@ -228,7 +221,6 @@ const EpisodesManager: React.FC = () => {
     setNewItem({
       number: nextNumber,
       title: '',
-      cutyLink: '',
       session: selectedSession
     });
   };
@@ -394,20 +386,6 @@ const EpisodesManager: React.FC = () => {
                 className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
               />
             </div>
-
-            <div className="md:col-span-4">
-              <label className="block text-sm font-medium text-slate-300 mb-2">
-                Cuty Link URL *
-              </label>
-              <input
-                type="url"
-                value={newItem.cutyLink}
-                onChange={(e) => setNewItem({ ...newItem, cutyLink: e.target.value })}
-                placeholder="https://cuty.io/..."
-                className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                required
-              />
-            </div>
           </div>
 
           <div className="flex gap-3">
@@ -466,7 +444,6 @@ const EpisodesManager: React.FC = () => {
                     <th className="p-3 text-left text-slate-300 font-medium">#</th>
                     <th className="p-3 text-left text-slate-300 font-medium">Session</th>
                     <th className="p-3 text-left text-slate-300 font-medium">Title</th>
-                    <th className="p-3 text-left text-slate-300 font-medium">Link</th>
                     <th className="p-3 text-left text-slate-300 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -483,18 +460,8 @@ const EpisodesManager: React.FC = () => {
                       </td>
                       <td className="p-3 text-white">{item.title}</td>
                       <td className="p-3">
-                        <a
-                          href={item.cutyLink}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-purple-400 hover:text-purple-300 text-sm break-all"
-                        >
-                          {item.cutyLink.substring(0, 50)}...
-                        </a>
-                      </td>
-                      <td className="p-3">
                         <div className="flex gap-2">
-                          {/* ✅ EDIT BUTTON */}
+                          {/* EDIT BUTTON */}
                           <button
                             onClick={() => handleEditItem(item)}
                             className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-sm transition-colors"
