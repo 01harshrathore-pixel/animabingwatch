@@ -1,4 +1,4 @@
- // server.cjs - CLEANED VERSION
+ // server.cjs - COMPLETE FIXED VERSION
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./db.cjs');
@@ -86,7 +86,7 @@ const createAdmin = async () => {
 };
 createAdmin();
 
-// ✅ EMERGENCY ADMIN RESET ROUTE - ADD THIS TO server.cjs
+// ✅ EMERGENCY ADMIN RESET ROUTE
 app.get('/api/admin/emergency-reset', async (req, res) => {
   try {
     const Admin = require('./models/Admin.cjs');
@@ -160,7 +160,7 @@ app.get('/api/admin/debug', async (req, res) => {
   }
 });
 
-// ✅ EMERGENCY ADMIN CREATION ROUTE - ADD THIS NEW ROUTE
+// ✅ EMERGENCY ADMIN CREATION ROUTE
 app.get('/api/admin/create-default-admin', async (req, res) => {
   try {
     const Admin = require('./models/Admin.cjs');
@@ -322,10 +322,7 @@ app.post('/api/admin/protected/track-ad-click', adminAuth, async (req, res) => {
   }
 });
 
-// ✅ PROTECTED ADMIN ROUTES
-app.use('/api/admin/protected', adminAuth, adminRoutes);
-
-// ✅ ADD MISSING ROUTES - YEH ADD KARO
+// ✅ MISSING ROUTES - ADDED
 app.get('/api/app-downloads', async (req, res) => {
   try {
     console.log('📱 Fetching app downloads...');
@@ -373,6 +370,26 @@ app.get('/api/social', async (req, res) => {
     res.json([]);
   }
 });
+
+// ✅ EPISODES BY ANIME ID ROUTE - ADDED
+app.get('/api/episodes/:animeId', async (req, res) => {
+  try {
+    const { animeId } = req.params;
+    console.log('📺 Fetching episodes for anime:', animeId);
+    
+    const Episode = require('./models/Episode.cjs');
+    const episodes = await Episode.find({ animeId }).sort({ session: 1, episodeNumber: 1 });
+    
+    console.log(`✅ Found ${episodes.length} episodes for anime ${animeId}`);
+    res.json(episodes);
+  } catch (error) {
+    console.error('Episodes fetch error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ✅ PROTECTED ADMIN ROUTES
+app.use('/api/admin/protected', adminAuth, adminRoutes);
 
 // ✅ PUBLIC ROUTES
 app.use('/api/anime', animeRoutes);
@@ -560,9 +577,9 @@ app.get('/', (req, res) => {
       <div class="container">
         <h1>Animabing Server</h1>
         <p>✅ Backend API is running correctly</p>
-        <p>📺 Frontend is available at: <a href="http://localhost:5173" target="_blank">http://localhost:5173</a></p>
+        <p>📺 Frontend is available at: <a href="https://rainbow-sfogliatella-b724c0.netlify.app" target="_blank">https://rainbow-sfogliatella-b724c0.netlify.app</a></p>
         <p>⚙️ Admin Access: Press Ctrl+Shift+Alt on the frontend</p>
-        <p>🔧 API Base: http://localhost:3000/api</p>
+        <p>🔧 API Base: https://animabing.onrender.com/api</p>
       </div>
     </body>
     </html>
@@ -571,8 +588,9 @@ app.get('/', (req, res) => {
 
 // ✅ START SERVER
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`🔧 Admin: Hellobrother / Anime2121818144`);
-  console.log(`📊 Admin Access: Press Ctrl+Shift+Alt`);
+app.listen(PORT, '0.0.0.0', () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`🔧 Admin: ${process.env.ADMIN_USER} / ${process.env.ADMIN_PASS}`);
+  console.log(`🌐 Frontend: https://rainbow-sfogliatella-b724c0.netlify.app`);
+  console.log(`🔗 API: https://animabing.onrender.com/api`);
 });
