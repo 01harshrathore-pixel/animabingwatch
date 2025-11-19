@@ -1,4 +1,4 @@
- // components/AnimeDetailPage.tsx - FIXED VERSION
+ // components/AnimeDetailPage.tsx - CUTYLINK REMOVED VERSION
 import React, { useState, useEffect } from 'react';
 import type { Anime, Episode } from '../src/types';
 import ReportButton from './ReportButton';
@@ -31,7 +31,19 @@ const AnimeDetailPage: React.FC<Props> = ({ anime, onBack }) => {
         
         const episodesData = await response.json();
         console.log('✅ Episodes loaded:', episodesData.length);
-        setEpisodes(episodesData);
+        
+        // ✅ CUTYLINK KO CLEAN KARO - agar localhost hai toh remove karo
+        const cleanedEpisodes = episodesData.map((episode: any) => ({
+          ...episode,
+          // Agar cutyLink localhost hai ya invalid hai, toh empty string karo
+          cutyLink: episode.cutyLink && 
+                   !episode.cutyLink.includes('localhost') && 
+                   episode.cutyLink.startsWith('http') 
+                   ? episode.cutyLink.trim() 
+                   : ''
+        }));
+        
+        setEpisodes(cleanedEpisodes);
       } catch (err) {
         console.error('❌ Error fetching episodes:', err);
         setError('Failed to load episodes');
@@ -45,15 +57,7 @@ const AnimeDetailPage: React.FC<Props> = ({ anime, onBack }) => {
       }
     };
 
-    // If anime already has episodes, use them directly
-    if (anime.episodes && anime.episodes.length > 0) {
-      console.log('✅ Using episodes from anime object:', anime.episodes.length);
-      setEpisodes(anime.episodes);
-      setIsLoading(false);
-    } else {
-      // Otherwise fetch episodes
-      fetchEpisodes();
-    }
+    fetchEpisodes();
   }, [anime]);
 
   console.log('🎬 AnimeDetailPage - Anime:', anime.title);
@@ -132,9 +136,6 @@ const AnimeDetailPage: React.FC<Props> = ({ anime, onBack }) => {
         {error && !isLoading && (
           <div className="bg-red-900/20 p-4 rounded-lg mb-4">
             <p className="text-red-400 text-sm">{error}</p>
-            <p className="text-red-300 text-xs mt-1">
-              Using data from anime object: {anime.episodes?.length || 0} episodes
-            </p>
           </div>
         )}
 
@@ -168,31 +169,30 @@ const AnimeDetailPage: React.FC<Props> = ({ anime, onBack }) => {
                           {episode.session > 1 && (
                             <span>Session {episode.session}</span>
                           )}
-                          {episode.cutyLink && (
-                            <span className="text-green-400">• Available</span>
-                          )}
+                          {/* ✅ CUTYLINK STATUS REMOVED */}
                         </div>
                       </div>
                       
                       <div className="flex gap-2">
-                        {episode.cutyLink ? (
-                          <a
-                            href={episode.cutyLink}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="bg-green-600 hover:bg-green-500 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
-                          >
-                            <span>▶</span>
-                            Watch
-                          </a>
-                        ) : (
-                          <button
-                            disabled
-                            className="bg-slate-600 text-slate-400 px-4 py-2 rounded-lg cursor-not-allowed"
-                          >
-                            No Link
-                          </button>
-                        )}
+                        {/* ✅ SIMPLE BUTTON - Link manually add karoge */}
+                        <button
+                          onClick={() => {
+                            // Yahan aap manually shortened link add kar sakte hain
+                            alert(`Episode ${episode.episodeNumber} - Manual link add karenge`);
+                          }}
+                          className="bg-purple-600 hover:bg-purple-500 text-white px-4 py-2 rounded-lg transition flex items-center gap-2"
+                        >
+                          <span>🔗</span>
+                          Add Link
+                        </button>
+                        
+                        {/* Report Button for episode */}
+                        <ReportButton 
+                          animeId={anime.id}
+                          episodeId={episode._id}
+                          episodeNumber={episode.episodeNumber}
+                          animeTitle={anime.title}
+                        />
                       </div>
                     </div>
                   </div>
