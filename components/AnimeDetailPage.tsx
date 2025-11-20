@@ -1,4 +1,4 @@
- // components/AnimeDetailPage.tsx - CLEAN DESIGN
+ // components/AnimeDetailPage.tsx - COLORFUL DESIGN
 import React, { useState, useEffect } from 'react';
 import type { Anime, Episode } from '../src/types';
 import ReportButton from './ReportButton';
@@ -94,27 +94,20 @@ const AnimeDetailPage: React.FC<Props> = ({ anime, onBack }) => {
                 {anime.description}
               </p>
 
-              {/* Info Grid - Clean Version */}
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div className="bg-slate-700 rounded-lg p-4">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Status</p>
-                  <p className="text-white font-semibold">{anime.status}</p>
-                </div>
-
-                <div className="bg-slate-700 rounded-lg p-4">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Release Year</p>
-                  <p className="text-white font-semibold">{anime.releaseYear}</p>
-                </div>
-
-                <div className="bg-slate-700 rounded-lg p-4">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Type</p>
-                  <p className="text-white font-semibold">{anime.contentType}</p>
-                </div>
-
-                <div className="bg-slate-700 rounded-lg p-4">
-                  <p className="text-slate-400 text-sm font-medium mb-1">Audio</p>
-                  <p className="text-white font-semibold">{anime.subDubStatus}</p>
-                </div>
+              {/* Info Tags - Colorful Version */}
+              <div className="flex flex-wrap gap-3 mb-6">
+                <span className="bg-blue-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                  Status: {anime.status}
+                </span>
+                <span className="bg-green-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                  Year: {anime.releaseYear}
+                </span>
+                <span className="bg-purple-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                  Type: {anime.contentType}
+                </span>
+                <span className="bg-orange-600 text-white px-4 py-2 rounded-md text-sm font-medium">
+                  Audio: {anime.subDubStatus}
+                </span>
               </div>
 
               {/* Genres */}
@@ -124,7 +117,7 @@ const AnimeDetailPage: React.FC<Props> = ({ anime, onBack }) => {
                   {anime.genreList?.map((genre, index) => (
                     <span
                       key={index}
-                      className="bg-purple-600 text-white px-3 py-1 rounded-md text-sm font-medium"
+                      className="bg-pink-600 text-white px-3 py-1 rounded-md text-sm font-medium"
                     >
                       {genre}
                     </span>
