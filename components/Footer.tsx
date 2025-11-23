@@ -1,4 +1,4 @@
- // components/Footer.tsx - UPDATED VERSION
+  // components/Footer.tsx - UPDATED WITH BETTER INSTAGRAM LOGO
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
@@ -137,10 +137,20 @@ const Footer: React.FC = () => {
         );
       case 'instagram':
         return (
-          <svg className={className} fill="#E4405F" viewBox="0 0 24 24">
-            <path d="M12.017 0C5.396 0 .029 5.367.029 11.987c0 6.62 5.367 11.987 11.988 11.987c6.62 0 11.987-5.367 11.987-11.987C24.014 5.367 18.637.001 12.017.001zM8.449 16.988c-1.297 0-2.448-.49-3.323-1.297C4.22 14.815 3.73 13.664 3.73 12.367s.49-2.448 1.396-3.323c.875-.807 2.026-1.297 3.323-1.297s2.448.49 3.323 1.297c.906.875 1.396 2.026 1.396 3.323s-.49 2.448-1.396 3.323c-.875.807-2.026 1.297-3.323 1.297z"/>
-            <circle cx="12.017" cy="12.029" r="3.21"/>
-            <path d="M16.2 7.8c.3 0 .5-.2.5-.5s-.2-.5-.5-.5-.5.2-.5.5.2.5.5.5z"/>
+          <svg className={className} viewBox="0 0 24 24">
+            <defs>
+              <linearGradient id="instagram-gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#fdf497" />
+                <stop offset="5%" stopColor="#fdf497" />
+                <stop offset="45%" stopColor="#fd5949" />
+                <stop offset="60%" stopColor="#d6249f" />
+                <stop offset="90%" stopColor="#285AEB" />
+              </linearGradient>
+            </defs>
+            <path 
+              d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z" 
+              fill="url(#instagram-gradient)"
+            />
           </svg>
         );
       case 'telegram':
@@ -160,7 +170,8 @@ const Footer: React.FC = () => {
 
   if (loading) {
     return (
-      <footer className="bg-gradient-to-b from-[#0a0c1c] to-[#15182e] border-t border-purple-500/20 mt-12">
+      // ✅ UPDATED: Consistent background gradient
+      <footer className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 border-t border-purple-500/20">
         <div className="container mx-auto py-12 px-4 text-center">
           <div className="animate-pulse flex justify-center space-x-8 mb-8">
             {[1, 2, 3].map(i => (
@@ -174,7 +185,8 @@ const Footer: React.FC = () => {
   }
 
   return (
-    <footer className="bg-gradient-to-b from-[#0a0c1c] to-[#15182e] border-t border-purple-500/20 mt-12">
+    // ✅ UPDATED: Consistent background gradient
+    <footer className="bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 border-t border-purple-500/20">
       <div className="container mx-auto py-12 px-4">
 
         {/* Main Footer Content */}
@@ -182,8 +194,8 @@ const Footer: React.FC = () => {
 
           {/* Brand Section */}
           <div className="text-center lg:text-left">
-            <h3 className="text-2xl font-bold text-white mb-4">
-              Anim<span className="text-purple-500">abing</span>
+            <h3 className="text-2xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent mb-4">
+              Anim<span className="text-purple-400">abing</span>
             </h3>
             <p className="text-slate-400 text-sm mb-4">
               Your ultimate destination for anime and movies. Watch, download, and enjoy your favorite content in high quality.
@@ -197,7 +209,7 @@ const Footer: React.FC = () => {
                   href={link.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="group bg-slate-800/50 hover:bg-purple-600 text-slate-400 hover:text-white p-3 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-lg hover:shadow-purple-500/25"
+                  className="group bg-slate-800/50 hover:bg-purple-600 text-slate-400 hover:text-white p-3 rounded-xl transition-all duration-300 transform hover:scale-110 hover:shadow-lg hover:shadow-purple-500/25 backdrop-blur-sm"
                   title={`Follow us on ${link.displayName}`}
                 >
                   <SocialIcon platform={link.platform} className="w-5 h-5" />
@@ -212,43 +224,43 @@ const Footer: React.FC = () => {
             <div className="grid grid-cols-2 gap-2 text-sm">
               <button
                 onClick={() => handleQuickLinkClick('home')}
-                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left"
+                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left font-medium"
               >
                 Home
               </button>
               <button
                 onClick={() => handleQuickLinkClick('hindi-dub')}
-                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left"
+                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left font-medium"
               >
                 Hindi Dub
               </button>
               <button
                 onClick={() => handleQuickLinkClick('hindi-sub')}
-                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left"
+                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left font-medium"
               >
                 Hindi Sub
               </button>
               <button
                 onClick={() => handleQuickLinkClick('movies')}
-                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left"
+                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left font-medium"
               >
                 Movies
               </button>
               <button
                 onClick={() => handleQuickLinkClick('manga')}
-                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left"
+                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left font-medium"
               >
                 Manga
               </button>
               <button
                 onClick={() => handleQuickLinkClick('anime-list')}
-                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left"
+                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left font-medium"
               >
                 Anime List
               </button>
               <button
                 onClick={() => handleQuickLinkClick('search')}
-                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left"
+                className="text-slate-400 hover:text-purple-400 transition-colors py-1 text-left font-medium"
               >
                 Search
               </button>
@@ -264,7 +276,7 @@ const Footer: React.FC = () => {
             <div className="flex flex-col space-y-3">
               <a
                 href={androidApp?.downloadUrl || '#'}
-                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 flex items-center justify-center gap-3 font-semibold"
+                className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-6 py-3 rounded-xl transition-all duration-300 transform hover:scale-105 hover:shadow-lg hover:shadow-purple-500/25 flex items-center justify-center gap-3 font-semibold"
                 onClick={(e) => {
                   if (!androidApp?.downloadUrl || androidApp.downloadUrl === '#') {
                     e.preventDefault();
@@ -301,15 +313,15 @@ const Footer: React.FC = () => {
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
             {/* Legal Links */}
             <div className="flex flex-wrap justify-center gap-6 text-sm">
-              <Link to="/terms" className="text-slate-400 hover:text-purple-400 transition-colors">Terms & Conditions</Link>
-              <Link to="/privacy" className="text-slate-400 hover:text-purple-400 transition-colors">Privacy Policy</Link>
-              <Link to="/dmca" className="text-slate-400 hover:text-purple-400 transition-colors">DMCA</Link>
-              <Link to="/contact" className="text-slate-400 hover:text-purple-400 transition-colors">Contact</Link>
+              <Link to="/terms" className="text-slate-400 hover:text-purple-400 transition-colors font-medium">Terms & Conditions</Link>
+              <Link to="/privacy" className="text-slate-400 hover:text-purple-400 transition-colors font-medium">Privacy Policy</Link>
+              <Link to="/dmca" className="text-slate-400 hover:text-purple-400 transition-colors font-medium">DMCA</Link>
+              <Link to="/contact" className="text-slate-400 hover:text-purple-400 transition-colors font-medium">Contact</Link>
             </div>
 
             {/* Copyright */}
             <div className="text-center md:text-right">
-              <p className="text-slate-400 text-sm">
+              <p className="text-slate-400 text-sm font-medium">
                 &copy; {new Date().getFullYear()} Animabing. All Rights Reserved.
               </p>
               <p className="text-slate-500 text-xs mt-1">
