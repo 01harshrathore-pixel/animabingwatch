@@ -1,4 +1,4 @@
-  // models/Anime.cjs - UPDATED WITH ENGLISH SUB
+  // models/Anime.cjs - UPDATED WITH ENGLISH SUB AND AUTO-UPDATE FEATURE
 const mongoose = require('mongoose');
 
 const animeSchema = new mongoose.Schema({
@@ -24,9 +24,20 @@ const animeSchema = new mongoose.Schema({
     default: 'Ongoing'
   },
   reportCount: { type: Number, default: 0 },
-  lastReported: Date
-}, { timestamps: true });
+  lastReported: Date,
+  
+  // ✅ YEH NAYA FIELD ADD KARO: Last episode/chapter added timestamp
+  lastContentAdded: { 
+    type: Date, 
+    default: Date.now 
+  }
+}, { 
+  timestamps: true, // ✅ Yeh automatically createdAt and updatedAt fields add karega
+  toJSON: { virtuals: true },
+  toObject: { virtuals: true }
+});
 
+// ✅ YEH VIRTUAL FIELDS ADD KARO
 animeSchema.virtual('episodes', {
   ref: 'Episode',
   localField: '_id',
@@ -39,7 +50,21 @@ animeSchema.virtual('chapters', {
   foreignField: 'mangaId'
 });
 
-animeSchema.set('toJSON', { virtuals: true });
-animeSchema.set('toObject', { virtuals: true });
+// ✅ YEH MIDDLEWARE ADD KARO: Jab bhi episode add ho to anime update ho
+animeSchema.pre('save', function(next) {
+  // Agar episodes array modify hui hai to lastContentAdded update karo
+  if (this.isModified('episodes') && this.episodes && this.episodes.length > 0) {
+    this.lastContentAdded = new Date();
+  }
+  next();
+});
+
+// ✅ YEH STATIC METHOD ADD KARO: Anime update karo jab episode add ho
+animeSchema.statics.updateLastContent = async function(animeId) {
+  await this.findByIdAndUpdate(animeId, {
+    lastContentAdded: new Date(),
+    updatedAt: new Date()
+  });
+};
 
 module.exports = mongoose.models.Anime || mongoose.model('Anime', animeSchema);
