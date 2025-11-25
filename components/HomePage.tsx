@@ -1,4 +1,4 @@
-  // components/HomePage.tsx - UPDATED CARD SIZE VERSION
+  // components/HomePage.tsx - UPDATED WITH ENGLISH SUB FILTER
 import React, { useState, useEffect, useMemo } from 'react';
 import type { Anime, FilterType, ContentTypeFilter } from '../src/types';
 import AnimeCard from './AnimeCard';
@@ -23,7 +23,6 @@ const HomePage: React.FC<Props> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // ✅ INITIAL LOAD - ONLY ON MOUNT
   useEffect(() => {
     const loadInitialAnime = async () => {
       try {
@@ -31,7 +30,6 @@ const HomePage: React.FC<Props> = ({
         setError(null);
         const data = await getAllAnime();
         
-        // ✅ FIXED: Simple array reverse - newest items will be first
         const reversedData = [...data].reverse();
         setAnimeList(reversedData);
       } catch (err) {
@@ -44,7 +42,6 @@ const HomePage: React.FC<Props> = ({
     loadInitialAnime();
   }, []);
 
-  // ✅ SEARCH EFFECT - RUNS WHEN searchQuery CHANGES
   useEffect(() => {
     const performSearch = async () => {
       if (searchQuery.trim() === '') {
@@ -70,7 +67,7 @@ const HomePage: React.FC<Props> = ({
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  // ✅ FILTER ANIME BASED ON CURRENT STATE
+  // ✅ UPDATED: Filter logic now includes English Sub
   const filteredAnime = useMemo(() => {
     let filtered = [...animeList];
 
@@ -81,7 +78,7 @@ const HomePage: React.FC<Props> = ({
       );
     }
 
-    // Dub/Sub filter
+    // Dub/Sub filter - NOW INCLUDES ENGLISH SUB
     if (filter !== 'All') {
       filtered = filtered.filter(anime => 
         anime.subDubStatus === filter
@@ -91,7 +88,6 @@ const HomePage: React.FC<Props> = ({
     return filtered;
   }, [animeList, filter, contentType]);
 
-  // ✅ RENDER LOGIC
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -152,8 +148,6 @@ const HomePage: React.FC<Props> = ({
             </div>
           </div>
         ) : (
-          // ✅ UPDATED: Larger cards while maintaining 3 per row on mobile
-          // Reduced gaps to accommodate larger cards
           <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 md:gap-3 lg:gap-4">
             {filteredAnime.map((anime, index) => (
               <AnimeCard
