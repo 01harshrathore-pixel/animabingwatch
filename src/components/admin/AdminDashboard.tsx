@@ -1,4 +1,4 @@
- // src/components/admin/AdminDashboard.tsx - UPDATED WITHOUT SETTINGS
+  // src/components/admin/AdminDashboard.tsx - UPDATED WITH ONLINE API
 import React, { useState, useEffect } from 'react';
 import AnimeListTable from './AnimeListTable';
 import AddAnimeForm from './AddAnimeForm';
@@ -9,7 +9,7 @@ import AdManager from './AdManager';
 import Spinner from '../Spinner';
 import axios from 'axios';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
+const API_BASE = 'https://animabing.onrender.com/api';
 
 interface AdminDashboardProps {
   onLogout?: () => void;
@@ -19,7 +19,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const [activeTab, setActiveTab] = useState('list');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [analytics, setAnalytics] = useState({ totalAnimes: 0, totalMovies: 0, totalEpisodes: 0, todayUsers: 0, totalUsers: 0 });
+  const [analytics, setAnalytics] = useState({ 
+    totalAnimes: 0, 
+    totalMovies: 0, 
+    totalEpisodes: 0, 
+    todayUsers: 0, 
+    totalUsers: 0,
+    totalManga: 0 // ADDED MANGA COUNT
+  });
   const [user, setUser] = useState({ username: '', email: '' });
   const token = localStorage.getItem('adminToken');
 
@@ -74,7 +81,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
   };
 
-  // UPDATED: Removed Settings tab
+  // UPDATED: Removed Settings tab (Manga tab bhi nahi add kiya)
   const tabs = [
     { id: 'list', label: 'Content List', component: <AnimeListTable /> },
     { id: 'add', label: 'Add Content', component: <AddAnimeForm /> },
@@ -122,22 +129,24 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             <span className="text-sm text-slate-400">Welcome back, {user.username}!</span>
           </div>
           <div className="flex items-center gap-4">
-            {/* Desktop view */}
+            {/* Desktop view - UPDATED WITH MANGA COUNT ONLY */}
             <div className="text-sm text-slate-400 hidden md:block">
-              <span className="text-purple-400">Content: {analytics.totalAnimes + analytics.totalMovies}</span>
+              <span className="text-purple-400">Content: {analytics.totalAnimes + analytics.totalMovies + analytics.totalManga}</span>
               <span className="mx-2">•</span>
               <span className="text-blue-400">Anime: {analytics.totalAnimes}</span>
               <span className="mx-2">•</span>
               <span className="text-green-400">Movies: {analytics.totalMovies}</span>
               <span className="mx-2">•</span>
+              <span className="text-orange-400">Manga: {analytics.totalManga}</span>
+              <span className="mx-2">•</span>
               <span className="text-yellow-400">Episodes: {analytics.totalEpisodes}</span>
               <span className="mx-2">•</span>
               <span className="text-pink-400">Users: {analytics.todayUsers}</span>
             </div>
-            {/* Mobile view */}
+            {/* Mobile view - UPDATED WITH MANGA COUNT ONLY */}
             <div className="text-sm text-slate-400 md:hidden">
-              Content: {analytics.totalAnimes + analytics.totalMovies} |
-              A:{analytics.totalAnimes} M:{analytics.totalMovies} |
+              Content: {analytics.totalAnimes + analytics.totalMovies + analytics.totalManga} |
+              A:{analytics.totalAnimes} M:{analytics.totalMovies} MG:{analytics.totalManga} |
               E:{analytics.totalEpisodes}
             </div>
             <button
