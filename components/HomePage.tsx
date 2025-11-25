@@ -1,4 +1,4 @@
-  // components/HomePage.tsx - EXACTLY SAME PLAY ICON IN BOTH
+  // components/HomePage.tsx
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Anime, FilterType, ContentTypeFilter } from '../src/types';
 import AnimeCard from './AnimeCard';
@@ -48,9 +48,9 @@ const HomePage: React.FC<Props> = ({
     return shuffled.slice(0, count);
   }, []);
 
-  // ✅ AUTO SLIDE CONFIGURATION
+  // ✅ AUTO SLIDE CONFIGURATION - MOBILE: 2 CARDS, DESKTOP: 6 CARDS
   const SLIDE_INTERVAL = 5000;
-  const MOBILE_CARDS_PER_SLIDE = 3;
+  const MOBILE_CARDS_PER_SLIDE = 2; // ✅ CHANGED FROM 3 TO 2
   const DESKTOP_CARDS_PER_SLIDE = 6;
 
   useEffect(() => {
@@ -259,12 +259,14 @@ const HomePage: React.FC<Props> = ({
             {searchQuery ? 'Searching...' : 'Latest Content'}
           </h1>
           <div className="space-y-8">
-            <div className="grid grid-cols-3 lg:grid-cols-6 gap-2 lg:gap-4">
+            {/* ✅ SLIDING SECTION SKELETON - 2 CARDS ON MOBILE */}
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 lg:gap-4">
               {Array.from({ length: cardsPerSlide }).map((_, index) => (
                 <SkeletonLoader key={index} type="card" />
               ))}
             </div>
-            <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
+            {/* ✅ ALL CONTENT SKELETON - 2 CARDS ON MOBILE */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
               {Array.from({ length: 12 }).map((_, index) => (
                 <SkeletonLoader key={index} type="card" />
               ))}
@@ -331,7 +333,7 @@ const HomePage: React.FC<Props> = ({
           </h2>
         </div>
 
-        {/* ✅ SLIDING SECTION - EXACTLY SAME PLAY ICON AS ALL CONTENT */}
+        {/* ✅ SLIDING SECTION - NOW 2 CARDS PER ROW ON MOBILE */}
         {dailyAnime.length > 0 && (
           <div className="relative mb-8 lg:mb-12">
             <div className="w-full">
@@ -355,11 +357,11 @@ const HomePage: React.FC<Props> = ({
                 </>
               )}
 
-              {/* ANIME CARDS GRID */}
+              {/* ✅ ANIME CARDS GRID - 2 CARDS ON MOBILE, 6 ON DESKTOP */}
               <div className={`grid gap-2 lg:gap-4 px-1 ${
                 cardsPerSlide === 6 
                   ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6' 
-                  : 'grid-cols-3'
+                  : 'grid-cols-2' // ✅ CHANGED FROM grid-cols-3 TO grid-cols-2
               }`}>
                 {currentAnimeSlide.map((anime, index) => (
                   <div 
@@ -422,7 +424,7 @@ const HomePage: React.FC<Props> = ({
                           </div>
                         </div>
 
-                        {/* ✅ EXACTLY SAME PLAY ICON AS ALL CONTENT - NO GRADIENT, SIMPLE WHITE CIRCLE */}
+                        {/* ✅ EXACTLY SAME PLAY ICON AS ALL CONTENT */}
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/20">
                           <div className="transform scale-75 group-hover:scale-90 transition-transform duration-300">
                             <div className="bg-white rounded-full flex items-center justify-center shadow-lg w-10 h-10 lg:w-12 lg:h-12">
@@ -462,7 +464,7 @@ const HomePage: React.FC<Props> = ({
           </div>
         )}
 
-        {/* ✅ ALL CONTENT SECTION */}
+        {/* ✅ ALL CONTENT SECTION - NOW 2 CARDS PER ROW ON MOBILE */}
         {filteredAnime.length === 0 ? (
           <div className="text-center py-8 lg:py-16">
             <div className="bg-slate-800/50 rounded-xl p-6 lg:p-8 max-w-md mx-auto border border-slate-700">
@@ -490,12 +492,13 @@ const HomePage: React.FC<Props> = ({
           </div>
         ) : (
           <>
-            {/* ALL ANIME GRID */}
+            {/* ALL ANIME GRID - 2 CARDS ON MOBILE */}
             <div className="mt-6 lg:mt-8">
               <h2 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent mb-3 lg:mb-4">
                 All Content
               </h2>
-              <div className="grid grid-cols-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
+              {/* ✅ CHANGED FROM grid-cols-3 TO grid-cols-2 FOR MOBILE */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
                 {filteredAnime.map((anime, index) => (
                   <AnimeCard
                     key={anime.id}
