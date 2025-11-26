@@ -38,7 +38,7 @@ const Header: React.FC<HeaderProps> = ({ onSearchChange, searchQuery, onNavigate
       <div className="container mx-auto px-4">
         <div className="flex justify-between items-center h-20">
           <button onClick={() => handleNavClick('home')} className="text-2xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
-            Anim<span className="text-purple-400">abing</span>
+            Anime<span className="text-purple-400">bing</span>
           </button>
 
           {/* Desktop Nav */}
