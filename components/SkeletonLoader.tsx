@@ -1,12 +1,13 @@
-// components/SkeletonLoader.tsx - YEH NAYI FILE BANAYEIN
+  // components/SkeletonLoader.tsx - FIXED VERSION
 import React from 'react';
 
+// ✅ Make type prop optional
 interface SkeletonLoaderProps {
-  type: 'card' | 'list' | 'text' | 'image';
+  type?: 'card' | 'list' | 'text' | 'image';
   count?: number;
 }
 
-export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ type, count = 1 }) => {
+export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ type = 'card', count = 1 }) => {
   const SkeletonCard = () => (
     <div className="bg-slate-700/50 rounded-lg overflow-hidden animate-pulse">
       <div className="aspect-[2/3] bg-slate-600/50"></div>
@@ -43,6 +44,10 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ type, count = 1 
     </div>
   );
 
+  const SkeletonImage = () => (
+    <div className="bg-slate-700/50 rounded-lg animate-pulse aspect-[2/3]"></div>
+  );
+
   switch (type) {
     case 'card':
       return (
@@ -56,10 +61,29 @@ export const SkeletonLoader: React.FC<SkeletonLoaderProps> = ({ type, count = 1 
       return <SkeletonList />;
     case 'text':
       return <SkeletonText />;
+    case 'image':
+      return (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 md:gap-6">
+          {[...Array(count)].map((_, i) => (
+            <SkeletonImage key={i} />
+          ))}
+        </div>
+      );
     default:
       return <SkeletonCard />;
   }
 };
+
+// ✅ Simple Skeleton without type prop (for HomePage)
+export const SimpleSkeleton: React.FC = () => (
+  <div className="bg-slate-700/50 rounded-lg overflow-hidden animate-pulse">
+    <div className="aspect-[2/3] bg-slate-600/50"></div>
+    <div className="p-4 space-y-2">
+      <div className="h-4 bg-slate-600/50 rounded w-3/4"></div>
+      <div className="h-3 bg-slate-600/50 rounded w-1/2"></div>
+    </div>
+  </div>
+);
 
 // Skeleton for anime detail page
 export const AnimeDetailSkeleton: React.FC = () => (
