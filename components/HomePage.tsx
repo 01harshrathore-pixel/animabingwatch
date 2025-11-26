@@ -1,9 +1,9 @@
-  // components/HomePage.tsx
+  // components/HomePage.tsx - FINAL OPTIMIZED VERSION
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Anime, FilterType, ContentTypeFilter } from '../src/types';
 import AnimeCard from './AnimeCard';
 import { SkeletonLoader } from './SkeletonLoader';
-import { getAllAnime, searchAnime } from '../services/animeService';
+import { getAnimePaginated, searchAnime } from '../services/animeService';
 
 interface Props {
   onAnimeSelect: (anime: Anime) => void;
@@ -23,6 +23,11 @@ const HomePage: React.FC<Props> = ({
   const [error, setError] = useState<string | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [dailyAnime, setDailyAnime] = useState<Anime[]>([]);
+  
+  // ✅ PAGINATION STATES
+  const [currentPage, setCurrentPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
 
   // ✅ DAILY ANIME SELECTION
   const getDailyAnime = useCallback((allAnime: Anime[]): Anime[] => {
@@ -42,39 +47,67 @@ const HomePage: React.FC<Props> = ({
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
     
-    const count = Math.min(18, shuffled.length);
+    const count = Math.min(12, shuffled.length);
     return shuffled.slice(0, count);
   }, []);
 
-  // ✅ AUTO SLIDE CONFIGURATION - MOBILE: 2 CARDS, DESKTOP: 6 CARDS
+  // ✅ AUTO SLIDE CONFIGURATION
   const SLIDE_INTERVAL = 5000;
   const MOBILE_CARDS_PER_SLIDE = 2;
   const DESKTOP_CARDS_PER_SLIDE = 6;
 
-  useEffect(() => {
-    const loadInitialAnime = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        const data = await getAllAnime();
-        
-        if (!data || data.length === 0) {
-          setError('No anime data available');
-          return;
-        }
-        
-        setAnimeList(data);
-        const dailySelection = getDailyAnime(data);
-        setDailyAnime(dailySelection);
-        
-      } catch (err) {
-        console.error('Error loading anime:', err);
-        setError('Failed to load anime data. Please try again later.');
-      } finally {
-        setIsLoading(false);
+  // ✅ OPTIMIZED: Load initial data with pagination
+  const loadInitialAnime = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      
+      const data = await getAnimePaginated(1, 36);
+      
+      if (!data || data.length === 0) {
+        setError('No anime data available');
+        return;
       }
-    };
+      
+      setAnimeList(data);
+      const dailySelection = getDailyAnime(data);
+      setDailyAnime(dailySelection);
+      setHasMore(data.length === 36);
+      setCurrentPage(1);
+      
+    } catch (err) {
+      console.error('Error loading anime:', err);
+      setError('Failed to load anime data. Please try again later.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
+  // ✅ OPTIMIZED: Load more data
+  const loadMoreAnime = async () => {
+    if (isLoadingMore || !hasMore) return;
+    
+    try {
+      setIsLoadingMore(true);
+      const nextPage = currentPage + 1;
+      const data = await getAnimePaginated(nextPage, 24);
+      
+      if (data.length === 0) {
+        setHasMore(false);
+      } else {
+        setAnimeList(prev => [...prev, ...data]);
+        setCurrentPage(nextPage);
+        setHasMore(data.length === 24);
+      }
+    } catch (err) {
+      console.error('Error loading more anime:', err);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // ✅ INITIAL LOAD
+  useEffect(() => {
     loadInitialAnime();
   }, [getDailyAnime]);
 
@@ -120,21 +153,14 @@ const HomePage: React.FC<Props> = ({
     return () => clearInterval(interval);
   }, [dailyAnime.length, cardsPerSlide]);
 
-  // ✅ SEARCH FUNCTIONALITY
+  // ✅ OPTIMIZED SEARCH
   useEffect(() => {
-    const abortController = new AbortController();
+    let isMounted = true;
 
     const performSearch = async () => {
       if (searchQuery.trim() === '') {
-        try {
-          const data = await getAllAnime();
-          setAnimeList(data);
-          const dailySelection = getDailyAnime(data);
-          setDailyAnime(dailySelection);
-        } catch (err) {
-          if (!abortController.signal.aborted) {
-            setError('Failed to load anime data');
-          }
+        if (isMounted) {
+          await loadInitialAnime();
         }
         return;
       }
@@ -142,18 +168,19 @@ const HomePage: React.FC<Props> = ({
       try {
         setIsLoading(true);
         const data = await searchAnime(searchQuery);
-        if (!abortController.signal.aborted) {
+        if (isMounted) {
           setAnimeList(data);
           const dailySelection = getDailyAnime(data);
           setDailyAnime(dailySelection);
           setError(null);
+          setHasMore(false);
         }
       } catch (err) {
-        if (!abortController.signal.aborted) {
+        if (isMounted) {
           setError('Search failed. Please try again.');
         }
       } finally {
-        if (!abortController.signal.aborted) {
+        if (isMounted) {
           setIsLoading(false);
         }
       }
@@ -162,7 +189,7 @@ const HomePage: React.FC<Props> = ({
     const timeoutId = setTimeout(performSearch, 300);
     
     return () => {
-      abortController.abort();
+      isMounted = false;
       clearTimeout(timeoutId);
     };
   }, [searchQuery, getDailyAnime]);
@@ -233,7 +260,7 @@ const HomePage: React.FC<Props> = ({
     setCurrentSlide(prev => (prev - 1 + totalSlides) % totalSlides);
   }, [dailyAnime.length, cardsPerSlide]);
 
-  // ✅ Keyboard navigation
+  // ✅ KEYBOARD NAVIGATION
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') prevSlide();
@@ -244,8 +271,24 @@ const HomePage: React.FC<Props> = ({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [prevSlide, nextSlide]);
 
+  // ✅ INFINITE SCROLL
+  useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + document.documentElement.scrollTop 
+          < document.documentElement.offsetHeight - 1000) return;
+      
+      if (!isLoadingMore && hasMore && !searchQuery) {
+        loadMoreAnime();
+      }
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isLoadingMore, hasMore, searchQuery]);
+
   const totalSlides = Math.ceil(dailyAnime.length / cardsPerSlide);
 
+  // ✅ LOADING STATE
   if (isLoading && animeList.length === 0) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -254,16 +297,14 @@ const HomePage: React.FC<Props> = ({
             {searchQuery ? 'Searching...' : 'Latest Content'}
           </h1>
           <div className="space-y-8">
-            {/* ✅ SLIDING SECTION SKELETON - 2 CARDS ON MOBILE */}
             <div className="grid grid-cols-2 lg:grid-cols-6 gap-2 lg:gap-4">
               {Array.from({ length: cardsPerSlide }).map((_, index) => (
-                <SkeletonLoader key={index} type="card" />
+                <SkeletonLoader key={index} />
               ))}
             </div>
-            {/* ✅ ALL CONTENT SKELETON - 2 CARDS ON MOBILE */}
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
               {Array.from({ length: 12 }).map((_, index) => (
-                <SkeletonLoader key={index} type="card" />
+                <SkeletonLoader key={index} />
               ))}
             </div>
           </div>
@@ -272,6 +313,7 @@ const HomePage: React.FC<Props> = ({
     );
   }
 
+  // ✅ ERROR STATE
   if (error) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
@@ -294,11 +336,12 @@ const HomePage: React.FC<Props> = ({
     );
   }
   
+  // ✅ MAIN RENDER
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <div className="container mx-auto px-4 py-4 lg:py-8">
         
-        {/* ✅ MOBILE FILTER BUTTONS */}
+        {/* MOBILE FILTER BUTTONS */}
         <div className="mb-4 lg:hidden">
           <div className="flex flex-nowrap gap-1 overflow-x-auto pb-1 scrollbar-hide">
             {filterButtons.map((filterBtn) => (
@@ -321,18 +364,17 @@ const HomePage: React.FC<Props> = ({
           </div>
         </div>
 
-        {/* ✅ MAIN CONTENT HEADING */}
+        {/* MAIN HEADING */}
         <div className="mb-4 lg:mb-6">
           <h2 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
             {contentType === 'All' ? 'Latest Content' : `Latest ${contentType}`}
           </h2>
         </div>
 
-        {/* ✅ SLIDING SECTION - NOW 2 CARDS PER ROW ON MOBILE */}
+        {/* FEATURED SLIDER */}
         {dailyAnime.length > 0 && (
           <div className="relative mb-8 lg:mb-12">
             <div className="w-full">
-              {/* SLIDER CONTROLS */}
               {dailyAnime.length > cardsPerSlide && (
                 <>
                   <button
@@ -352,7 +394,6 @@ const HomePage: React.FC<Props> = ({
                 </>
               )}
 
-              {/* ✅ ANIME CARDS GRID - 2 CARDS ON MOBILE, 6 ON DESKTOP */}
               <div className={`grid gap-2 lg:gap-4 px-1 ${
                 cardsPerSlide === 6 
                   ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6' 
@@ -363,7 +404,6 @@ const HomePage: React.FC<Props> = ({
                     key={`${anime.id}-${currentSlide}-${index}`}
                     className="transform transition-all duration-500 ease-in-out"
                   >
-                    {/* ✅ SLIDING CARD */}
                     <div 
                       className="cursor-pointer rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 w-full h-full group focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900"
                       onClick={() => onAnimeSelect(anime)}
@@ -388,14 +428,10 @@ const HomePage: React.FC<Props> = ({
                           }}
                         />
                         
-                        {/* GRADIENT OVERLAY */}
                         <div className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent flex flex-col justify-end ${
                           cardsPerSlide === 6 ? 'p-3 lg:p-4' : 'p-2'
                         } group-hover:bg-black/70 transition-all duration-300`}>
-                          
-                          {/* CONTENT */}
                           <div className="transform transition-transform duration-300">
-                            {/* TITLE */}
                             <h3 className={`text-white font-bold line-clamp-2 drop-shadow-lg leading-tight ${
                               cardsPerSlide === 6 
                                 ? 'text-sm lg:text-base mb-1 lg:mb-2' 
@@ -403,8 +439,6 @@ const HomePage: React.FC<Props> = ({
                             }`}>
                               {anime.title}
                             </h3>
-                            
-                            {/* DETAILS */}
                             <div className="flex items-center justify-between">
                               <p className={`text-slate-300 ${
                                 cardsPerSlide === 6 ? 'text-sm' : 'text-[10px]'
@@ -422,7 +456,6 @@ const HomePage: React.FC<Props> = ({
                           </div>
                         </div>
 
-                        {/* ✅ PLAY ICON */}
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/20">
                           <div className="transform scale-75 group-hover:scale-90 transition-transform duration-300">
                             <div className="bg-white rounded-full flex items-center justify-center shadow-lg w-10 h-10 lg:w-12 lg:h-12">
@@ -438,7 +471,6 @@ const HomePage: React.FC<Props> = ({
                 ))}
               </div>
 
-              {/* SLIDE INDICATORS */}
               {totalSlides > 1 && (
                 <div className="flex justify-center mt-4 space-x-1">
                   {Array.from({ length: totalSlides }).map((_, index) => (
@@ -459,7 +491,7 @@ const HomePage: React.FC<Props> = ({
           </div>
         )}
 
-        {/* ✅ ALL CONTENT SECTION - NOW 2 CARDS PER ROW ON MOBILE */}
+        {/* ALL CONTENT SECTION */}
         {filteredAnime.length === 0 ? (
           <div className="text-center py-8 lg:py-16">
             <div className="bg-slate-800/50 rounded-xl p-6 lg:p-8 max-w-md mx-auto border border-slate-700">
@@ -487,7 +519,6 @@ const HomePage: React.FC<Props> = ({
           </div>
         ) : (
           <>
-            {/* ALL ANIME GRID - 2 CARDS ON MOBILE */}
             <div className="mt-6 lg:mt-8">
               <h2 className="text-xl lg:text-2xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent mb-3 lg:mb-4">
                 All Content
@@ -502,6 +533,27 @@ const HomePage: React.FC<Props> = ({
                   />
                 ))}
               </div>
+
+              {/* LOAD MORE SECTION */}
+              {hasMore && !searchQuery && (
+                <div className="flex justify-center mt-8">
+                  <button
+                    onClick={loadMoreAnime}
+                    disabled={isLoadingMore}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-8 py-3 rounded-lg transition-all duration-300 font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                  >
+                    {isLoadingMore ? 'Loading...' : 'Load More Anime'}
+                  </button>
+                </div>
+              )}
+
+              {isLoadingMore && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3 mt-4">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <SkeletonLoader key={`more-${index}`} />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
