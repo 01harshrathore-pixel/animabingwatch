@@ -1,10 +1,10 @@
- // components/Contact.tsx - FINAL WORKING VERSION
+  // components/Contact.tsx - FINAL WORKING VERSION
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import Spinner from './Spinner';
 
-const API_BASE = 'https://animabing.onrender.com/api';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
 
 const Contact: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -32,7 +32,6 @@ const Contact: React.FC = () => {
         setMessageType('success');
         setFormData({ name: '', email: '', subject: '', message: '' });
         
-        // 5 seconds baad message hide ho jayega
         setTimeout(() => {
           setSubmitMessage('');
         }, 5000);
@@ -58,15 +57,19 @@ const Contact: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0c1c] text-white py-8">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 text-white py-8">
       <div className="container mx-auto px-4 max-w-4xl">
-        <Link to="/" className="inline-flex items-center text-purple-400 hover:text-purple-300 mb-6">
+        <Link to="/" className="inline-flex items-center text-purple-400 hover:text-purple-300 mb-6 transition-colors">
           &larr; Back to Home
         </Link>
         
-        <div className="bg-slate-800/50 rounded-lg p-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Contact Us</h1>
-          <p className="text-slate-400 mb-6">Get in touch with the Animabing team</p>
+        <div className="bg-slate-800/50 rounded-lg p-8 backdrop-blur-sm border border-purple-500/20">
+          <div className="text-left mb-8">
+            <h1 className="text-3xl font-bold text-slate-100 border-l-4 border-purple-500 pl-4">
+              Contact Us
+            </h1>
+            <p className="text-slate-400 mt-2">Get in touch with the Animebing team</p>
+          </div>
 
           {/* Success/Error Message */}
           {submitMessage && (
@@ -92,61 +95,75 @@ const Contact: React.FC = () => {
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Contact Information */}
-            <div>
-              <h2 className="text-xl font-semibold text-white mb-4">Get In Touch</h2>
-              
-              <div className="space-y-4">
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    </svg>
+            <div className="space-y-6">
+              <div className="bg-slate-800/50 rounded-lg p-6">
+                <h2 className="text-xl font-semibold text-white mb-4">Get In Touch</h2>
+                
+                <div className="space-y-4">
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-medium">Email</h3>
+                      <p className="text-slate-300">animebingofficial@gmail.com</p>
+                      <p className="text-slate-500 text-sm mt-1">Direct contact</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-white font-medium">Email</h3>
-                    <p className="text-slate-400">animebingofficial@gmail.com</p>
-                    <p className="text-slate-500 text-sm mt-1">Direct contact</p>
-                  </div>
-                </div>
 
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                    </svg>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-medium">Support</h3>
+                      <p className="text-slate-300">We're here to help with any questions</p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-white font-medium">Support</h3>
-                    <p className="text-slate-400">We're here to help with any questions</p>
-                  </div>
-                </div>
 
-                <div className="flex items-start space-x-3">
-                  <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
-                  <div>
-                    <h3 className="text-white font-medium">Response Time</h3>
-                    <p className="text-slate-400">Typically within 24-48 hours</p>
+                  <div className="flex items-start space-x-3">
+                    <div className="w-8 h-8 bg-green-600 rounded-full flex items-center justify-center flex-shrink-0">
+                      <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-white font-medium">Response Time</h3>
+                      <p className="text-slate-300">Typically within 24-48 hours</p>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="mt-8 p-4 bg-slate-700/50 rounded-lg">
-                <h3 className="text-lg font-semibold text-white mb-2">Before Contacting Us</h3>
-                <ul className="text-slate-400 text-sm space-y-1">
-                  <li>• Check our FAQ section</li>
-                  <li>• Ensure you've read our Terms & Conditions</li>
-                  <li>• For DMCA requests, use the dedicated process</li>
-                  <li>• Provide detailed information for faster resolution</li>
+              <div className="bg-slate-800/50 rounded-lg p-6">
+                <h3 className="text-lg font-semibold text-white mb-3">Before Contacting Us</h3>
+                <ul className="text-slate-300 space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-1">•</span>
+                    <span>Check our FAQ section</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-1">•</span>
+                    <span>Ensure you've read our Terms & Conditions</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-1">•</span>
+                    <span>For DMCA requests, use the dedicated process</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="text-purple-400 mt-1">•</span>
+                    <span>Provide detailed information for faster resolution</span>
+                  </li>
                 </ul>
               </div>
 
               {/* Direct Email Option */}
-              <div className="mt-6 p-4 bg-purple-600/20 rounded-lg border border-purple-500/30">
-                <h3 className="text-lg font-semibold text-purple-400 mb-2">Prefer Direct Email?</h3>
+              <div className="bg-slate-800/50 rounded-lg p-6 border border-purple-500/30">
+                <h3 className="text-lg font-semibold text-white mb-2">Prefer Direct Email?</h3>
                 <p className="text-slate-300 text-sm mb-3">
                   You can also email us directly at:
                 </p>
@@ -163,10 +180,10 @@ const Contact: React.FC = () => {
             </div>
 
             {/* Contact Form */}
-            <div>
+            <div className="bg-slate-800/50 rounded-lg p-6">
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-1">
+                  <label htmlFor="name" className="block text-sm font-medium text-slate-300 mb-2">
                     Your Name *
                   </label>
                   <input
@@ -177,13 +194,13 @@ const Contact: React.FC = () => {
                     onChange={handleChange}
                     required
                     disabled={isSubmitting}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50"
+                    className="w-full bg-slate-700/50 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50"
                     placeholder="Enter your full name"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">
+                  <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
                     Email Address *
                   </label>
                   <input
@@ -194,13 +211,13 @@ const Contact: React.FC = () => {
                     onChange={handleChange}
                     required
                     disabled={isSubmitting}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50"
+                    className="w-full bg-slate-700/50 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50"
                     placeholder="your@email.com"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="subject" className="block text-sm font-medium text-slate-300 mb-1">
+                  <label htmlFor="subject" className="block text-sm font-medium text-slate-300 mb-2">
                     Subject *
                   </label>
                   <select
@@ -210,7 +227,7 @@ const Contact: React.FC = () => {
                     onChange={handleChange}
                     required
                     disabled={isSubmitting}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50"
+                    className="w-full bg-slate-700/50 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50"
                   >
                     <option value="">Select a subject</option>
                     <option value="General Inquiry">General Inquiry</option>
@@ -225,7 +242,7 @@ const Contact: React.FC = () => {
                 </div>
 
                 <div>
-                  <label htmlFor="message" className="block text-sm font-medium text-slate-300 mb-1">
+                  <label htmlFor="message" className="block text-sm font-medium text-slate-300 mb-2">
                     Message *
                   </label>
                   <textarea
@@ -236,7 +253,7 @@ const Contact: React.FC = () => {
                     required
                     disabled={isSubmitting}
                     rows={5}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50"
+                    className="w-full bg-slate-700/50 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors disabled:opacity-50"
                     placeholder="Please describe your inquiry in detail. The more information you provide, the better we can help you."
                   />
                 </div>
