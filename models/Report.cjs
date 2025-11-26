@@ -1,11 +1,11 @@
- // models/Report.cjs - VERIFIED VERSION
+  // models/Report.cjs - UPDATED VERSION
 const mongoose = require('mongoose');
 
 const reportSchema = new mongoose.Schema({
+  // Episode Report Fields
   animeId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Anime',
-    required: true
+    ref: 'Anime'
   },
   episodeId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -15,12 +15,27 @@ const reportSchema = new mongoose.Schema({
   issueType: {
     type: String,
     enum: ['Link Not Working', 'Wrong Episode', 'Poor Quality', 'Audio Issue', 'Subtitle Issue', 'Other'],
-    required: true
+    required: false
   },
-  description: String,
+  
+  // Contact Form Fields
+  name: String,
   email: {
     type: String,
-    default: 'Not provided'
+    required: true
+  },
+  subject: String,
+  message: {
+    type: String,
+    required: true
+  },
+  
+  // Common Fields
+  type: {
+    type: String,
+    enum: ['episode', 'contact'],
+    default: 'episode',
+    required: true
   },
   username: {
     type: String,
@@ -42,14 +57,6 @@ const reportSchema = new mongoose.Schema({
   responseDate: Date
 }, { 
   timestamps: true 
-});
-
-// ✅ Add this for better error messages
-reportSchema.post('save', function(error, doc, next) {
-  if (error.name === 'ValidationError') {
-    console.log('❌ Validation Error:', error.errors);
-  }
-  next(error);
 });
 
 module.exports = mongoose.models.Report || mongoose.model('Report', reportSchema);
