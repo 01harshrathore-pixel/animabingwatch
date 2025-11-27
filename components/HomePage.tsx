@@ -12,6 +12,9 @@ interface Props {
   contentType: ContentTypeFilter;
 }
 
+// Constant for fields to be requested
+const ANIME_FIELDS = 'title,thumbnail,releaseYear,status,contentType,subDubStatus,description,genreList';
+
 const HomePage: React.FC<Props> = ({ 
   onAnimeSelect, 
   searchQuery, 
@@ -62,7 +65,7 @@ const HomePage: React.FC<Props> = ({
       setIsLoading(true);
       setError(null);
       
-      const data = await getAnimePaginated(1, 36);
+      const data = await getAnimePaginated(1, 36, ANIME_FIELDS);
       
       if (!data || data.length === 0) {
         setError('No anime data available');
@@ -90,7 +93,7 @@ const HomePage: React.FC<Props> = ({
     try {
       setIsLoadingMore(true);
       const nextPage = currentPage + 1;
-      const data = await getAnimePaginated(nextPage, 24);
+      const data = await getAnimePaginated(nextPage, 24, ANIME_FIELDS);
       
       if (data.length === 0) {
         setHasMore(false);
@@ -167,7 +170,7 @@ const HomePage: React.FC<Props> = ({
 
       try {
         setIsLoading(true);
-        const data = await searchAnime(searchQuery);
+        const data = await searchAnime(searchQuery, ANIME_FIELDS);
         if (isMounted) {
           setAnimeList(data);
           const dailySelection = getDailyAnime(data);
