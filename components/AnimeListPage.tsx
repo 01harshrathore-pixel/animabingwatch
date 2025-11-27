@@ -2,20 +2,19 @@
 import type { Anime, FilterType } from '../src/types';
 import { getAllAnime } from '../services/animeService';
 import Spinner from './Spinner';
-import AdSlot from './AdSlot'; // Assuming AdSlot is imported; adjust path if needed
+import AdSlot from './AdSlot';
 
 interface AnimeListPageProps {
   onAnimeSelect: (anime: Anime) => void;
-  filter: FilterType;
-  setFilter: (filter: FilterType) => void;
 }
 
-const AnimeListPage: React.FC<AnimeListPageProps> = ({ onAnimeSelect, filter, setFilter }) => {
+const AnimeListPage: React.FC<AnimeListPageProps> = ({ onAnimeSelect }) => {
   const [allAnime, setAllAnime] = useState<Anime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isFiltering, setIsFiltering] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [localFilter, setLocalFilter] = useState<FilterType>('All');
 
   useEffect(() => {
     const fetchAnime = async () => {
@@ -45,26 +44,26 @@ const AnimeListPage: React.FC<AnimeListPageProps> = ({ onAnimeSelect, filter, se
       );
     }
     
-    // Apply type filter
-    if (filter !== 'All') {
-      result = result.filter(anime => anime.subDubStatus === filter);
+    // Apply type filter - use LOCAL filter only
+    if (localFilter !== 'All') {
+      result = result.filter(anime => anime.subDubStatus === localFilter);
     }
     
     return result.sort((a, b) => a.title.localeCompare(b.title));
-  }, [allAnime, filter, searchQuery]);
+  }, [allAnime, localFilter, searchQuery]);
 
   // Effect to manage the filtering loading indicator for a smoother UX
   useEffect(() => {
     if (isFiltering) {
-      const timer = setTimeout(() => setIsFiltering(false), 300); // Simulate loading for better feedback
+      const timer = setTimeout(() => setIsFiltering(false), 300);
       return () => clearTimeout(timer);
     }
   }, [sortedAndFilteredAnime, isFiltering]);
 
   const handleFilterChange = (newFilter: FilterType) => {
-    if (newFilter !== filter) {
+    if (newFilter !== localFilter) {
       setIsFiltering(true);
-      setFilter(newFilter);
+      setLocalFilter(newFilter);
     }
   };
 
@@ -107,14 +106,16 @@ const AnimeListPage: React.FC<AnimeListPageProps> = ({ onAnimeSelect, filter, se
             )}
           </div>
 
-          {/* Filter Buttons */}
-          <div className="flex flex-wrap gap-1 bg-slate-800/50 p-1 rounded-lg max-w-full">
+          {/* Filter Buttons - Smaller buttons without scrollbar */}
+          <div className="flex overflow-x-auto gap-1 bg-slate-800/50 p-1 rounded-lg w-full sm:w-auto 
+                          [-ms-overflow-style:none] [scrollbar-width:none] 
+                          [&::-webkit-scrollbar]:hidden">
             {filterOptions.map(option => (
               <button
                 key={option}
                 onClick={() => handleFilterChange(option)}
                 className={`px-2 py-1 text-xs font-medium rounded transition-colors whitespace-nowrap flex-shrink-0 ${
-                  filter === option
+                  localFilter === option
                     ? 'bg-purple-600 text-white'
                     : 'text-slate-300 hover:bg-slate-700'
                 }`}
@@ -125,24 +126,6 @@ const AnimeListPage: React.FC<AnimeListPageProps> = ({ onAnimeSelect, filter, se
           </div>
         </div>
       </div>
-
-      {/* Search results info */}
-      {searchQuery && (
-        <div className="mb-4 text-slate-300">
-          <p>
-            {sortedAndFilteredAnime.length > 0 
-              ? `Found ${sortedAndFilteredAnime.length} anime matching "${searchQuery}"`
-              : `No anime found matching "${searchQuery}"`
-            }
-          </p>
-          <button 
-            onClick={clearSearch}
-            className="text-purple-400 hover:text-purple-300 text-sm mt-1"
-          >
-            Clear search
-          </button>
-        </div>
-      )}
 
       {/* Ad before anime list */}
       <div className="mb-6 hidden lg:block">
