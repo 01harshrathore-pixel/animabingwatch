@@ -1,4 +1,4 @@
-  // App.tsx - UPDATED WITH ENGLISH SUB
+  // App.tsx - UPDATED WITH ANIME LIST ROUTE
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
 import type { Anime, FilterType, ContentType, ContentTypeFilter } from './src/types';
@@ -251,7 +251,7 @@ const MainApp: React.FC = () => {
 
   const handleNavigate = (destination: 'home' | 'list') => {
     if (destination === 'list') {
-      navigate('/list');
+      navigate('/anime'); // ✅ CHANGED: Now navigates to /anime instead of /list
     } else {
       navigate('/');
     }
@@ -329,13 +329,16 @@ const MainApp: React.FC = () => {
               contentType={contentType}
             />
           } />
-          <Route path="/list" element={
+          
+          {/* ✅ ADDED: Anime List Route */}
+          <Route path="/anime" element={
             <AnimeListPage 
               onAnimeSelect={handleAnimeSelect}
               filter={filter}
               setFilter={handleFilterChange}
             />
           } />
+          
           <Route path="/detail/:animeId" element={<DetailPageWrapper onBack={handleBack} />} />
           <Route path="/privacy" element={<PrivacyPolicy />} />
           <Route path="/dmca" element={<DMCA />} />
