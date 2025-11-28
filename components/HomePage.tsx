@@ -1,61 +1,48 @@
   // components/HomePage.tsx - UPDATED VERSION
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { Anime, FilterType, ContentTypeFilter } from '../src/types';
 import AnimeCard from './AnimeCard';
 import { SkeletonLoader } from './SkeletonLoader';
 import { getAnimePaginated, searchAnime } from '../services/animeService';
-
 interface Props {
   onAnimeSelect: (anime: Anime) => void;
   searchQuery: string;
   filter: FilterType;
   contentType: ContentTypeFilter;
 }
-
 // Constant for fields to be requested
 const ANIME_FIELDS = 'title,thumbnail,releaseYear,status,contentType,subDubStatus,description,genreList';
-
-const HomePage: React.FC<Props> = ({ 
-  onAnimeSelect, 
-  searchQuery, 
-  filter, 
-  contentType 
+const HomePage: React.FC<Props> = ({
+  onAnimeSelect,
+  searchQuery,
+  filter,
+  contentType
 }) => {
   const [animeList, setAnimeList] = useState<Anime[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [dailyAnime, setDailyAnime] = useState<Anime[]>([]);
-  
   // ✅ PAGINATION STATES
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-
+  // ✅ TOUCH SWIPE REFS
+  const touchStartX = useRef(0);
+  const touchStartY = useRef(0);
+  // ✅ SLIDE FUNCTION REFS
+  const prevSlideRef = useRef<(() => void)>(() => {});
+  const nextSlideRef = useRef<(() => void)>(() => {});
   // ✅ DYNAMIC HEADING TEXT BASED ON FILTER
   const getSectionHeading = useCallback(() => {
-    if (contentType !== 'All') {
-      return `Latest ${contentType}`;
-    }
-    
-    switch (filter) {
-      case 'Hindi Dub':
-        return 'Latest Hindi Dub';
-      case 'Hindi Sub':
-        return 'Latest Hindi Sub';
-      case 'English Sub':
-        return 'Latest English Sub';
-      default:
-        return 'Latest Content';
-    }
-  }, [filter, contentType]);
-
+    return 'Latest Content';
+  }, []);
   // ✅ DYNAMIC ALL CONTENT TEXT BASED ON FILTER
   const getAllContentHeading = useCallback(() => {
     if (contentType !== 'All') {
       return `All ${contentType}`;
     }
-    
+  
     switch (filter) {
       case 'Hindi Dub':
         return 'All Hindi Dub';
@@ -67,53 +54,67 @@ const HomePage: React.FC<Props> = ({
         return 'All Content';
     }
   }, [filter, contentType]);
-
   // ✅ DAILY ANIME SELECTION
   const getDailyAnime = useCallback((allAnime: Anime[]): Anime[] => {
     if (allAnime.length === 0) return [];
-    
+  
     const today = new Date();
     const seed = today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
-    
+  
     const seededRandom = (index: number) => {
       const x = Math.sin(seed + index * 100) * 10000;
       return Math.abs((x - Math.floor(x)) * 10000);
     };
-
     const shuffled = [...allAnime];
     for (let i = shuffled.length - 1; i > 0; i--) {
       const j = Math.floor(seededRandom(i) % (i + 1));
       [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
     }
-    
+  
     const count = Math.min(12, shuffled.length);
     return shuffled.slice(0, count);
   }, []);
-
   // ✅ AUTO SLIDE CONFIGURATION
   const SLIDE_INTERVAL = 5000;
   const MOBILE_CARDS_PER_SLIDE = 2;
   const DESKTOP_CARDS_PER_SLIDE = 6;
-
+  // ✅ TOUCH HANDLERS
+  const handleTouchStart = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  }, []);
+  const handleTouchEnd = useCallback((e: React.TouchEvent<HTMLDivElement>) => {
+    const endX = e.changedTouches[0].clientX;
+    const endY = e.changedTouches[0].clientY;
+    const deltaX = endX - touchStartX.current;
+    const deltaY = endY - touchStartY.current;
+    if (Math.abs(deltaY) > Math.abs(deltaX)) return; // Vertical swipe
+    if (Math.abs(deltaX) < 50) return; // Not enough swipe distance
+    if (deltaX > 0) {
+      prevSlideRef.current();
+    } else {
+      nextSlideRef.current();
+    }
+  }, []);
   // ✅ OPTIMIZED: Load initial data with pagination
   const loadInitialAnime = async () => {
     try {
       setIsLoading(true);
       setError(null);
-      
+    
       const data = await getAnimePaginated(1, 36, ANIME_FIELDS);
-      
+    
       if (!data || data.length === 0) {
         setError('No anime data available');
         return;
       }
-      
+    
       setAnimeList(data);
       const dailySelection = getDailyAnime(data);
       setDailyAnime(dailySelection);
       setHasMore(data.length === 36);
       setCurrentPage(1);
-      
+    
     } catch (err) {
       console.error('Error loading anime:', err);
       setError('Failed to load anime data. Please try again later.');
@@ -121,16 +122,15 @@ const HomePage: React.FC<Props> = ({
       setIsLoading(false);
     }
   };
-
   // ✅ OPTIMIZED: Load more data
   const loadMoreAnime = async () => {
     if (isLoadingMore || !hasMore) return;
-    
+  
     try {
       setIsLoadingMore(true);
       const nextPage = currentPage + 1;
       const data = await getAnimePaginated(nextPage, 24, ANIME_FIELDS);
-      
+    
       if (data.length === 0) {
         setHasMore(false);
       } else {
@@ -144,24 +144,20 @@ const HomePage: React.FC<Props> = ({
       setIsLoadingMore(false);
     }
   };
-
   // ✅ INITIAL LOAD
   useEffect(() => {
     loadInitialAnime();
   }, [getDailyAnime]);
-
   // ✅ GET CARDS PER SLIDE
   const getCardsPerSlide = useCallback(() => {
     if (typeof window === 'undefined') return MOBILE_CARDS_PER_SLIDE;
     return window.innerWidth >= 1024 ? DESKTOP_CARDS_PER_SLIDE : MOBILE_CARDS_PER_SLIDE;
   }, []);
-
   const [cardsPerSlide, setCardsPerSlide] = useState(getCardsPerSlide());
-
   // ✅ HANDLE RESIZE
   useEffect(() => {
     let resizeTimeout: NodeJS.Timeout;
-    
+  
     const handleResize = () => {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
@@ -170,32 +166,44 @@ const HomePage: React.FC<Props> = ({
         setCurrentSlide(0);
       }, 150);
     };
-
     window.addEventListener('resize', handleResize);
     return () => {
       window.removeEventListener('resize', handleResize);
       clearTimeout(resizeTimeout);
     };
   }, [getCardsPerSlide]);
-
+  // ✅ MANUAL SLIDE CONTROLS
+  const nextSlide = useCallback(() => {
+    if (dailyAnime.length <= cardsPerSlide) return;
+    const totalSlides = Math.ceil(dailyAnime.length / cardsPerSlide);
+    setCurrentSlide(prev => (prev + 1) % totalSlides);
+  }, [dailyAnime.length, cardsPerSlide]);
+  const prevSlide = useCallback(() => {
+    if (dailyAnime.length <= cardsPerSlide) return;
+    const totalSlides = Math.ceil(dailyAnime.length / cardsPerSlide);
+    setCurrentSlide(prev => (prev - 1 + totalSlides) % totalSlides);
+  }, [dailyAnime.length, cardsPerSlide]);
+  // ✅ UPDATE REFS
+  useEffect(() => {
+    prevSlideRef.current = prevSlide;
+  }, [prevSlide]);
+  useEffect(() => {
+    nextSlideRef.current = nextSlide;
+  }, [nextSlide]);
   // ✅ AUTO SLIDE EFFECT
   useEffect(() => {
     if (dailyAnime.length <= cardsPerSlide) return;
-
     const interval = setInterval(() => {
       setCurrentSlide(prev => {
         const totalSlides = Math.ceil(dailyAnime.length / cardsPerSlide);
         return (prev + 1) % totalSlides;
       });
     }, SLIDE_INTERVAL);
-
     return () => clearInterval(interval);
   }, [dailyAnime.length, cardsPerSlide]);
-
   // ✅ OPTIMIZED SEARCH
   useEffect(() => {
     let isMounted = true;
-
     const performSearch = async () => {
       if (searchQuery.trim() === '') {
         if (isMounted) {
@@ -203,7 +211,6 @@ const HomePage: React.FC<Props> = ({
         }
         return;
       }
-
       try {
         setIsLoading(true);
         const data = await searchAnime(searchQuery, ANIME_FIELDS);
@@ -224,49 +231,42 @@ const HomePage: React.FC<Props> = ({
         }
       }
     };
-
     const timeoutId = setTimeout(performSearch, 300);
-    
+  
     return () => {
       isMounted = false;
       clearTimeout(timeoutId);
     };
   }, [searchQuery, getDailyAnime]);
-
   // ✅ FILTER LOGIC
   const filteredAnime = useMemo(() => {
     let filtered = [...animeList];
-
     if (contentType !== 'All') {
-      filtered = filtered.filter(anime => 
+      filtered = filtered.filter(anime =>
         anime.contentType === contentType
       );
     }
-
     if (filter !== 'All') {
-      filtered = filtered.filter(anime => 
+      filtered = filtered.filter(anime =>
         anime.subDubStatus === filter
       );
     }
-
     return filtered;
   }, [animeList, filter, contentType]);
-
   // ✅ CURRENT SLIDING ANIME
   const currentAnimeSlide = useMemo(() => {
     const start = currentSlide * cardsPerSlide;
     const end = start + cardsPerSlide;
     const slideAnime = dailyAnime.slice(start, end);
-    
+  
     if (slideAnime.length < cardsPerSlide) {
       const remaining = cardsPerSlide - slideAnime.length;
       const extraAnime = dailyAnime.slice(0, remaining);
       return [...slideAnime, ...extraAnime];
     }
-    
+  
     return slideAnime;
   }, [dailyAnime, currentSlide, cardsPerSlide]);
-
   // ✅ FILTER BUTTONS
   const filterButtons = [
     { key: 'All' as FilterType, label: 'All' },
@@ -274,7 +274,6 @@ const HomePage: React.FC<Props> = ({
     { key: 'Hindi Sub' as FilterType, label: 'Hindi Sub' },
     { key: 'English Sub' as FilterType, label: 'English Sub' }
   ];
-
   // ✅ HANDLE FILTER CHANGE
   const handleFilterChange = (newFilter: FilterType) => {
     const url = new URL(window.location.href);
@@ -285,48 +284,29 @@ const HomePage: React.FC<Props> = ({
     }
     window.location.href = url.toString();
   };
-
-  // ✅ MANUAL SLIDE CONTROLS
-  const nextSlide = useCallback(() => {
-    if (dailyAnime.length <= cardsPerSlide) return;
-    const totalSlides = Math.ceil(dailyAnime.length / cardsPerSlide);
-    setCurrentSlide(prev => (prev + 1) % totalSlides);
-  }, [dailyAnime.length, cardsPerSlide]);
-
-  const prevSlide = useCallback(() => {
-    if (dailyAnime.length <= cardsPerSlide) return;
-    const totalSlides = Math.ceil(dailyAnime.length / cardsPerSlide);
-    setCurrentSlide(prev => (prev - 1 + totalSlides) % totalSlides);
-  }, [dailyAnime.length, cardsPerSlide]);
-
   // ✅ KEYBOARD NAVIGATION
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') prevSlide();
-      if (e.key === 'ArrowRight') nextSlide();
+      if (e.key === 'ArrowLeft') prevSlideRef.current();
+      if (e.key === 'ArrowRight') nextSlideRef.current();
     };
-
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [prevSlide, nextSlide]);
-
+  }, []);
   // ✅ INFINITE SCROLL
   useEffect(() => {
     const handleScroll = () => {
-      if (window.innerHeight + document.documentElement.scrollTop 
+      if (window.innerHeight + document.documentElement.scrollTop
           < document.documentElement.offsetHeight - 1000) return;
-      
+    
       if (!isLoadingMore && hasMore && !searchQuery) {
         loadMoreAnime();
       }
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isLoadingMore, hasMore, searchQuery]);
-
+  }, [isLoadingMore, hasMore, searchQuery, loadMoreAnime]);
   const totalSlides = Math.ceil(dailyAnime.length / cardsPerSlide);
-
   // ✅ LOADING STATE
   if (isLoading && animeList.length === 0) {
     return (
@@ -351,7 +331,6 @@ const HomePage: React.FC<Props> = ({
       </div>
     );
   }
-
   // ✅ ERROR STATE
   if (error) {
     return (
@@ -374,12 +353,11 @@ const HomePage: React.FC<Props> = ({
       </div>
     );
   }
-  
   // ✅ MAIN RENDER
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <div className="container mx-auto px-4 py-4 lg:py-8">
-        
+      
         {/* MOBILE FILTER BUTTONS */}
         <div className="mb-4 lg:hidden">
           <div className="flex flex-nowrap gap-1 overflow-x-auto pb-1 scrollbar-hide">
@@ -388,7 +366,7 @@ const HomePage: React.FC<Props> = ({
                 key={filterBtn.key}
                 onClick={() => handleFilterChange(filterBtn.key)}
                 className={`
-                  px-2 py-1 rounded-md text-[10px] font-medium transition-all duration-200 
+                  px-2 py-1 rounded-md text-[10px] font-medium transition-all duration-200
                   border shadow-sm hover:shadow whitespace-nowrap flex-shrink-0
                   transform hover:scale-102 active:scale-98 min-w-[60px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900
                   ${filter === filterBtn.key
@@ -402,18 +380,20 @@ const HomePage: React.FC<Props> = ({
             ))}
           </div>
         </div>
-
         {/* MAIN HEADING - NOW DYNAMIC */}
         <div className="mb-4 lg:mb-6">
           <h2 className="text-2xl lg:text-3xl font-bold bg-gradient-to-r from-white to-purple-200 bg-clip-text text-transparent">
             {getSectionHeading()}
           </h2>
         </div>
-
         {/* FEATURED SLIDER */}
         {dailyAnime.length > 0 && (
           <div className="relative mb-8 lg:mb-12">
-            <div className="w-full">
+            <div 
+              className="w-full"
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+            >
               {dailyAnime.length > cardsPerSlide && (
                 <>
                   <button
@@ -432,18 +412,17 @@ const HomePage: React.FC<Props> = ({
                   </button>
                 </>
               )}
-
               <div className={`grid gap-2 lg:gap-4 px-1 ${
-                cardsPerSlide === 6 
-                  ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6' 
+                cardsPerSlide === 6
+                  ? 'grid-cols-2 md:grid-cols-3 lg:grid-cols-6'
                   : 'grid-cols-2'
               }`}>
                 {currentAnimeSlide.map((anime, index) => (
-                  <div 
+                  <div
                     key={`${anime.id}-${currentSlide}-${index}`}
                     className="transform transition-all duration-500 ease-in-out"
                   >
-                    <div 
+                    <div
                       className="cursor-pointer rounded-lg overflow-hidden shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 w-full h-full group focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900"
                       onClick={() => onAnimeSelect(anime)}
                       onKeyDown={(e) => {
@@ -466,14 +445,14 @@ const HomePage: React.FC<Props> = ({
                             e.currentTarget.src = '/images/fallback-thumbnail.jpg';
                           }}
                         />
-                        
+                      
                         <div className={`absolute inset-0 bg-gradient-to-t from-black/95 via-black/50 to-transparent flex flex-col justify-end ${
                           cardsPerSlide === 6 ? 'p-3 lg:p-4' : 'p-2'
                         } group-hover:bg-black/70 transition-all duration-300`}>
                           <div className="transform transition-transform duration-300">
                             <h3 className={`text-white font-bold line-clamp-2 drop-shadow-lg leading-tight ${
-                              cardsPerSlide === 6 
-                                ? 'text-sm lg:text-base mb-1 lg:mb-2' 
+                              cardsPerSlide === 6
+                                ? 'text-sm lg:text-base mb-1 lg:mb-2'
                                 : 'text-xs mb-1'
                             }`}>
                               {anime.title}
@@ -485,8 +464,8 @@ const HomePage: React.FC<Props> = ({
                                 {anime.releaseYear}
                               </p>
                               <span className={`bg-purple-600 text-white font-semibold rounded ${
-                                cardsPerSlide === 6 
-                                  ? 'text-xs px-2 py-1' 
+                                cardsPerSlide === 6
+                                  ? 'text-xs px-2 py-1'
                                   : 'text-[10px] px-1 py-0.5 whitespace-nowrap'
                               }`}>
                                 {anime.subDubStatus}
@@ -494,7 +473,6 @@ const HomePage: React.FC<Props> = ({
                             </div>
                           </div>
                         </div>
-
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-black/20">
                           <div className="transform scale-75 group-hover:scale-90 transition-transform duration-300">
                             <div className="bg-white rounded-full flex items-center justify-center shadow-lg w-10 h-10 lg:w-12 lg:h-12">
@@ -509,7 +487,6 @@ const HomePage: React.FC<Props> = ({
                   </div>
                 ))}
               </div>
-
               {totalSlides > 1 && (
                 <div className="flex justify-center mt-4 space-x-1">
                   {Array.from({ length: totalSlides }).map((_, index) => (
@@ -517,8 +494,8 @@ const HomePage: React.FC<Props> = ({
                       key={index}
                       onClick={() => setCurrentSlide(index)}
                       className={`w-1.5 h-1.5 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-2 focus:ring-offset-slate-900 ${
-                        currentSlide === index 
-                          ? 'bg-white w-4' 
+                        currentSlide === index
+                          ? 'bg-white w-4'
                           : 'bg-gray-500 hover:bg-gray-300'
                       }`}
                       aria-label={`Go to slide ${index + 1}`}
@@ -529,7 +506,6 @@ const HomePage: React.FC<Props> = ({
             </div>
           </div>
         )}
-
         {/* ALL CONTENT SECTION - NOW WITH DYNAMIC HEADING */}
         {filteredAnime.length === 0 ? (
           <div className="text-center py-8 lg:py-16">
@@ -539,7 +515,7 @@ const HomePage: React.FC<Props> = ({
                 {searchQuery ? 'No Results Found' : 'No Anime Available'}
               </h2>
               <p className="text-slate-400 text-sm lg:text-base">
-                {searchQuery 
+                {searchQuery
                   ? `No results for "${searchQuery}"`
                   : 'Check back later for new content'
                 }
@@ -573,7 +549,6 @@ const HomePage: React.FC<Props> = ({
                   />
                 ))}
               </div>
-
               {/* LOAD MORE SECTION */}
               {hasMore && !searchQuery && (
                 <div className="flex justify-center mt-8">
@@ -586,7 +561,6 @@ const HomePage: React.FC<Props> = ({
                   </button>
                 </div>
               )}
-
               {isLoadingMore && (
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3 mt-4">
                   {Array.from({ length: 6 }).map((_, index) => (
@@ -601,5 +575,4 @@ const HomePage: React.FC<Props> = ({
     </div>
   );
 };
-
 export default HomePage;
