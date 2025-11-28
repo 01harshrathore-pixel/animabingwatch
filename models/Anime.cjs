@@ -1,4 +1,4 @@
-  // models/Anime.cjs - UPDATED WITH ENGLISH SUB AND AUTO-UPDATE FEATURE
+ // models/Anime.cjs - UPDATED WITH FEATURED ANIME FIELDS
 const mongoose = require('mongoose');
 
 const animeSchema = new mongoose.Schema({
@@ -30,6 +30,16 @@ const animeSchema = new mongoose.Schema({
   lastContentAdded: { 
     type: Date, 
     default: Date.now 
+  },
+
+  // ✅ YEH DO NAYE FIELDS ADD KARO FEATURED ANIME KE LIYE
+  isFeatured: {
+    type: Boolean,
+    default: false
+  },
+  featuredOrder: {
+    type: Number,
+    default: 0
   }
 }, { 
   timestamps: true, // ✅ Yeh automatically createdAt and updatedAt fields add karega
