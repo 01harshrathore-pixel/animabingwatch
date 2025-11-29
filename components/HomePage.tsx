@@ -1,4 +1,4 @@
-  // components/HomePage.tsx - UPDATED WITH IMPROVED FEATURED ANIME API HANDLING
+   // components/HomePage.tsx - UPDATED WITH IMPROVED FEATURED ANIME API HANDLING
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Anime, FilterType, ContentTypeFilter } from '../src/types';
 import AnimeCard from './AnimeCard';
