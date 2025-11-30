@@ -1,8 +1,9 @@
-   // src/components/admin/AdminDashboard.tsx - UPDATED WITH ONLINE API
+ // src/components/admin/AdminDashboard.tsx - UPDATED WITH FEATURED ANIME MANAGER TAB
 import React, { useState, useEffect } from 'react';
 import AnimeListTable from './AnimeListTable';
 import AddAnimeForm from './AddAnimeForm';
 import EpisodesManager from './EpisodesManager';
+import FeaturedAnimeManager from './FeaturedAnimeManager'; // ✅ ADDED IMPORT
 import ReportsManager from './ReportsManager';
 import SocialMediaManager from './SocialMediaManager';
 import AdManager from './AdManager';
@@ -25,7 +26,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     totalEpisodes: 0, 
     todayUsers: 0, 
     totalUsers: 0,
-    totalManga: 0 // ADDED MANGA COUNT
+    totalManga: 0
   });
   const [user, setUser] = useState({ username: '', email: '' });
   const token = localStorage.getItem('adminToken');
@@ -81,11 +82,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     }
   };
 
-  // UPDATED: Removed Settings tab (Manga tab bhi nahi add kiya)
+  // ✅ UPDATED TABS ARRAY WITH FEATURED ANIME MANAGER
   const tabs = [
     { id: 'list', label: 'Content List', component: <AnimeListTable /> },
     { id: 'add', label: 'Add Content', component: <AddAnimeForm /> },
     { id: 'episodes', label: 'Episodes', component: <EpisodesManager /> },
+    { id: 'featured', label: 'Featured Anime', component: <FeaturedAnimeManager /> }, // ✅ ADDED TAB
     { id: 'reports', label: 'User Reports', component: <ReportsManager /> },
     { id: 'social', label: 'Social Media', component: <SocialMediaManager /> },
     { id: 'ads', label: 'Ad Management', component: <AdManager /> }
@@ -129,7 +131,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             <span className="text-sm text-slate-400">Welcome back, {user.username}!</span>
           </div>
           <div className="flex items-center gap-4">
-            {/* Desktop view - UPDATED WITH MANGA COUNT ONLY */}
+            {/* Desktop view */}
             <div className="text-sm text-slate-400 hidden md:block">
               <span className="text-purple-400">Content: {analytics.totalAnimes + analytics.totalMovies + analytics.totalManga}</span>
               <span className="mx-2">•</span>
@@ -143,7 +145,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               <span className="mx-2">•</span>
               <span className="text-pink-400">Users: {analytics.todayUsers}</span>
             </div>
-            {/* Mobile view - UPDATED WITH MANGA COUNT ONLY */}
+            {/* Mobile view */}
             <div className="text-sm text-slate-400 md:hidden">
               Content: {analytics.totalAnimes + analytics.totalMovies + analytics.totalManga} |
               A:{analytics.totalAnimes} M:{analytics.totalMovies} MG:{analytics.totalManga} |
