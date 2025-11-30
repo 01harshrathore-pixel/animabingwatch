@@ -1,7 +1,37 @@
-  // routes/animeRoutes.cjs - OPTIMIZED VERSION
+ // routes/animeRoutes.cjs - OPTIMIZED VERSION WITH FEATURED ROUTE
 const express = require('express');
 const router = express.Router();
 const Anime = require('../models/Anime.cjs');
+
+/**
+ * ✅ ADDED: FEATURED ANIME ROUTE (FIXES THE ERROR)
+ * This must be added BEFORE the /:id route
+ */
+router.get('/featured', async (req, res) => {
+  try {
+    // ✅ Get featured anime - adjust query based on your schema
+    const featuredAnime = await Anime.find({ 
+      featured: true 
+    })
+    .select('title thumbnail releaseYear subDubStatus contentType updatedAt createdAt bannerImage rating')
+    .sort({ createdAt: -1 })
+    .limit(10)
+    .lean();
+
+    // ✅ Set cache headers for featured content
+    res.set({
+      'Cache-Control': 'public, max-age=600', // 10 minutes cache for featured
+    });
+
+    res.json({ 
+      success: true, 
+      data: featuredAnime
+    });
+  } catch (err) {
+    console.error('Error fetching featured anime:', err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
 
 /**
  * ✅ OPTIMIZED: GET anime with PAGINATION
