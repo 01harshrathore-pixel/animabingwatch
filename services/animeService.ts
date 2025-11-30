@@ -1,4 +1,4 @@
-  // services/animeService.ts - OPTIMIZED VERSION
+ // services/animeService.ts - OPTIMIZED VERSION WITH FEATURED ANIME
 import type { Anime } from '../src/types';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'https://animabing.onrender.com/api';
@@ -6,6 +6,49 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'https://animabing.onrender.co
 // ✅ CACHE IMPLEMENTATION
 const cache = new Map();
 const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+
+// ✅ ADDED: FEATURED ANIME FUNCTION (FIXES THE MISSING FUNCTION)
+export const getFeaturedAnime = async (): Promise<Anime[]> => {
+  const cacheKey = 'featured-anime';
+  
+  // Check cache first
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log('🎯 Cache hit for featured anime');
+    return cached.data;
+  }
+
+  try {
+    console.log('📡 Fetching featured anime from API...');
+    
+    const response = await fetch(`${API_BASE}/anime/featured`);
+    
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    const result = await response.json();
+    let featuredData = [];
+    
+    if (result.success && Array.isArray(result.data)) {
+      featuredData = result.data.map((anime: any) => ({
+        ...anime,
+        id: anime._id || anime.id,
+        lastUpdated: anime.updatedAt ? new Date(anime.updatedAt).getTime() : Date.now()
+      }));
+    }
+
+    // Store in cache
+    cache.set(cacheKey, {
+      data: featuredData,
+      timestamp: Date.now()
+    });
+
+    console.log(`✅ Loaded ${featuredData.length} featured anime`);
+    return featuredData;
+  } catch (error) {
+    console.error('❌ Error in getFeaturedAnime:', error);
+    return [];
+  }
+};
 
 // ✅ UPDATED: Paginated API calls with fields parameter
 export const getAnimePaginated = async (page: number = 1, limit: number = 24, fields?: string): Promise<Anime[]> => {
