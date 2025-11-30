@@ -9,12 +9,12 @@ const Anime = require('../models/Anime.cjs');
  */
 router.get('/featured', async (req, res) => {
   try {
-    // ✅ Get featured anime - adjust query based on your schema
+    // ✅ Get featured anime - using featured field from schema
     const featuredAnime = await Anime.find({ 
       featured: true 
     })
     .select('title thumbnail releaseYear subDubStatus contentType updatedAt createdAt bannerImage rating')
-    .sort({ createdAt: -1 })
+    .sort({ featuredOrder: -1, createdAt: -1 }) // ✅ Added featuredOrder for manual ordering
     .limit(10)
     .lean();
 
@@ -122,7 +122,7 @@ router.get('/search', async (req, res) => {
 });
 
 /**
- * ✅ GET single anime by ID (Unchanged)
+ * ✅ GET single anime by ID
  */
 router.get('/:id', async (req, res) => {
   try {
@@ -130,6 +130,13 @@ router.get('/:id', async (req, res) => {
     if (!item) return res.status(404).json({ success: false, message: 'Anime not found' });
     res.json({ success: true, data: item });
   } catch (err) {
+    // ✅ Better error handling for invalid ObjectId
+    if (err.name === 'CastError') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid anime ID format' 
+      });
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
