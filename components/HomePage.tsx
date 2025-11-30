@@ -1,10 +1,10 @@
- // components/HomePage.tsx - FIXED VERSION
+ // components/HomePage.tsx - FIXED IMPORT PATHS
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Anime, FilterType, ContentTypeFilter } from '../src/types';
 import AnimeCard from './AnimeCard';
 import { SkeletonLoader } from './SkeletonLoader';
-import { getAnimePaginated, searchAnime, getFeaturedAnime } from '../services/animeServices'; // ✅ FIXED: Import name and added getFeaturedAnime
-import FeaturedAnimeCarousel from './FeaturedAnimeCarousel'; // ✅ FIXED: Correct import path
+import { getAnimePaginated, searchAnime, getFeaturedAnime } from '../services/animeService'; // ✅ FIXED: Remove 's' from animeServices
+import FeaturedAnimeCarousel from '../src/components/FeaturedAnimeCarousel'; // ✅ FIXED: Correct path
 
 interface Props {
   onAnimeSelect: (anime: Anime) => void;
