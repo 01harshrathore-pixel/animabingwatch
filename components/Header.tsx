@@ -1,10 +1,13 @@
-  // components/Header.tsx - UPDATED WITH ENGLISH SUB BUTTON
+  // components/Header.tsx - UPDATED WITH ENGLISH SUB BUTTON AND ADS HIDDEN
 import React, { useState } from 'react';
 import type { FilterType, ContentType } from '../src/types';
 import { SearchIcon } from './icons/SearchIcon';
 import { MenuIcon } from './icons/MenuIcon';
 import { CloseIcon } from './icons/CloseIcon';
-import AdSlot from './AdSlot';
+// import AdSlot from './AdSlot'; // ✅ TEMPORARILY COMMENTED OUT
+
+// ✅ ADD THIS FLAG TO TEMPORARILY HIDE ALL ADS
+const SHOW_ADS = false;
 
 interface HeaderProps {
   onSearchChange: (query: string) => void;
@@ -73,10 +76,12 @@ const Header: React.FC<HeaderProps> = ({ onSearchChange, searchQuery, onNavigate
           </div>
         </div>
 
-        {/* Header Ad Slot */}
-        <div className="hidden lg:block w-full max-w-[728px] mx-auto mt-4">
-          <AdSlot position="header" />
-        </div>
+        {/* Header Ad Slot - ONLY SHOW WHEN SHOW_ADS IS TRUE */}
+        {SHOW_ADS && (
+          <div className="hidden lg:block w-full max-w-[728px] mx-auto mt-4">
+            {/* <AdSlot position="header" /> */}
+          </div>
+        )}
       </div>
 
       {/* Mobile Menu - Dropdown */}
