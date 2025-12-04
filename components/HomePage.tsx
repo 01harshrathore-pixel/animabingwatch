@@ -1,14 +1,10 @@
-   // components/HomePage.tsx - COMPLETE VERSION WITH ADS
+  // components/HomePage.tsx - SIMPLIFIED VERSION WITHOUT SIDEBAR
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { Anime, FilterType, ContentTypeFilter } from '../src/types';
 import AnimeCard from './AnimeCard';
 import { SkeletonLoader } from './SkeletonLoader';
 import { getAnimePaginated, searchAnime, getFeaturedAnime } from '../services/animeService';
 import FeaturedAnimeCarousel from '../src/components/FeaturedAnimeCarousel';
-import AdSlot from './AdSlot'; // ✅ ADDED: Import AdSlot component
-import axios from 'axios'; // ✅ ADDED: For fetching ad slots
-
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
 
 interface Props {
   onAnimeSelect: (anime: Anime) => void;
@@ -19,17 +15,6 @@ interface Props {
 
 // Constant for fields to be requested
 const ANIME_FIELDS = 'title,thumbnail,releaseYear,status,contentType,subDubStatus,description,genreList';
-
-interface AdSlotData {
-  _id: string;
-  name: string;
-  position: string;
-  adCode: string;
-  isActive: boolean;
-  earnings: number;
-  impressions: number;
-  clicks: number;
-}
 
 const HomePage: React.FC<Props> = ({
   onAnimeSelect,
@@ -42,43 +27,10 @@ const HomePage: React.FC<Props> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  // ✅ AD SLOTS STATE
-  const [adSlots, setAdSlots] = useState<AdSlotData[]>([]);
-  const [adLoading, setAdLoading] = useState(true);
-  
   // ✅ PAGINATION STATES
   const [currentPage, setCurrentPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
   const [isLoadingMore, setIsLoadingMore] = useState(false);
-
-  // ✅ FETCH AD SLOTS
-  const fetchAdSlots = useCallback(async () => {
-    try {
-      setAdLoading(true);
-      console.log('📢 Fetching active ad slots...');
-      
-      const response = await axios.get(`${API_BASE}/ad-slots/active`);
-      
-      if (response.data && Array.isArray(response.data)) {
-        setAdSlots(response.data);
-        console.log(`✅ Loaded ${response.data.length} active ad slots`);
-      } else {
-        console.warn('⚠️ No active ad slots found');
-        setAdSlots([]);
-      }
-    } catch (err) {
-      console.error('❌ Error fetching ad slots:', err);
-      // Don't break the page if ads fail
-      setAdSlots([]);
-    } finally {
-      setAdLoading(false);
-    }
-  }, []);
-
-  // ✅ HELPER: Get ad by position
-  const getAdByPosition = useCallback((position: string): AdSlotData | null => {
-    return adSlots.find(slot => slot.position === position) || null;
-  }, [adSlots]);
 
   // ✅ FIXED: SIMPLIFIED FETCH FEATURED ANIMES
   const fetchFeaturedAnimes = useCallback(async () => {
@@ -190,11 +142,10 @@ const HomePage: React.FC<Props> = ({
     const initializeData = async () => {
       await loadInitialAnime();
       await fetchFeaturedAnimes();
-      await fetchAdSlots(); // ✅ ADDED: Fetch ad slots
     };
    
     initializeData();
-  }, [loadInitialAnime, fetchFeaturedAnimes, fetchAdSlots]);
+  }, [loadInitialAnime, fetchFeaturedAnimes]);
 
   // ✅ FIXED: SEARCH
   useEffect(() => {
@@ -205,7 +156,6 @@ const HomePage: React.FC<Props> = ({
         if (isMounted) {
           await loadInitialAnime();
           await fetchFeaturedAnimes();
-          await fetchAdSlots();
         }
         return;
       }
@@ -215,7 +165,7 @@ const HomePage: React.FC<Props> = ({
         const data = await searchAnime(searchQuery, ANIME_FIELDS);
         if (isMounted) {
           setAnimeList(data);
-          setFeaturedAnimes([]); // Clear featured during search
+          setFeaturedAnimes([]);
           setError(null);
           setHasMore(false);
         }
@@ -236,7 +186,7 @@ const HomePage: React.FC<Props> = ({
       isMounted = false;
       clearTimeout(timeoutId);
     };
-  }, [searchQuery, loadInitialAnime, fetchFeaturedAnimes, fetchAdSlots]);
+  }, [searchQuery, loadInitialAnime, fetchFeaturedAnimes]);
 
   // ✅ FILTER LOGIC
   const filteredAnime = useMemo(() => {
@@ -297,7 +247,6 @@ const HomePage: React.FC<Props> = ({
             {searchQuery ? 'Searching...' : 'Loading...'}
           </h1>
           <div className="space-y-8">
-            {/* Featured Carousel Skeleton */}
             <div className="h-64 bg-gray-800 rounded-lg animate-pulse"></div>
            
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
@@ -334,30 +283,10 @@ const HomePage: React.FC<Props> = ({
     );
   }
 
-  // ✅ GET AD SLOTS DATA
-  const headerAd = getAdByPosition('header');
-  const inContentAd = getAdByPosition('in_content');
-  const sidebarAd = getAdByPosition('sidebar');
-  const stickyFooterAd = getAdByPosition('sticky_footer');
-
-  // ✅ MAIN RENDER
+  // ✅ MAIN RENDER - WITHOUT SIDEBAR
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
       <div className="container mx-auto px-4 py-4 lg:py-8">
-     
-        {/* TOP HEADER AD - Only show when not searching */}
-        {!searchQuery && headerAd && (
-          <div className="mb-6">
-            <AdSlot
-              position="header"
-              className="w-full"
-              adCode={headerAd.adCode}
-              isActive={headerAd.isActive}
-              onAdLoaded={() => console.log('✅ Header ad loaded')}
-              onAdError={(err) => console.error('❌ Header ad error:', err)}
-            />
-          </div>
-        )}
      
         {/* FEATURED ANIME CAROUSEL */}
         {!searchQuery && featuredAnimes.length > 0 && (
@@ -429,151 +358,42 @@ const HomePage: React.FC<Props> = ({
                 {getAllContentHeading()}
               </h2>
               
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-                {/* MAIN CONTENT - 9 columns on large screens */}
-                <div className="lg:col-span-9">
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
-                    {/* First 6 anime cards */}
-                    {filteredAnime.slice(0, 6).map((anime, index) => (
-                      <AnimeCard
-                        key={anime.id || anime._id}
-                        anime={anime}
-                        onClick={onAnimeSelect}
-                        index={index}
-                      />
-                    ))}
-                  </div>
-                  
-                  {/* IN-CONTENT AD - After first 6 cards */}
-                  {!searchQuery && inContentAd && (
-                    <div className="my-6">
-                      <AdSlot
-                        position="in_content"
-                        className="w-full"
-                        adCode={inContentAd.adCode}
-                        isActive={inContentAd.isActive}
-                        onAdLoaded={() => console.log('✅ In-content ad loaded')}
-                        onAdError={(err) => console.error('❌ In-content ad error:', err)}
-                      />
-                    </div>
-                  )}
-                  
-                  {/* Rest of anime cards */}
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
-                    {filteredAnime.slice(6).map((anime, index) => (
-                      <AnimeCard
-                        key={anime.id || anime._id}
-                        anime={anime}
-                        onClick={onAnimeSelect}
-                        index={index + 6}
-                      />
-                    ))}
-                  </div>
-                  
-                  {/* LOAD MORE SECTION */}
-                  {hasMore && !searchQuery && (
-                    <div className="flex justify-center mt-8">
-                      <button
-                        onClick={loadMoreAnime}
-                        disabled={isLoadingMore}
-                        className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-8 py-3 rounded-lg transition-all duration-300 font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900"
-                      >
-                        {isLoadingMore ? 'Loading...' : 'Load More Anime'}
-                      </button>
-                    </div>
-                  )}
-                  
-                  {/* STICKY FOOTER AD - Before load more */}
-                  {!searchQuery && stickyFooterAd && (
-                    <div className="my-8">
-                      <AdSlot
-                        position="sticky_footer"
-                        className="w-full"
-                        adCode={stickyFooterAd.adCode}
-                        isActive={stickyFooterAd.isActive}
-                        onAdLoaded={() => console.log('✅ Footer ad loaded')}
-                        onAdError={(err) => console.error('❌ Footer ad error:', err)}
-                      />
-                    </div>
-                  )}
-                  
-                  {isLoadingMore && (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3 mt-4">
-                      {Array.from({ length: 6 }).map((_, index) => (
-                        <SkeletonLoader key={`more-${index}`} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                {/* SIDEBAR - 3 columns on large screens */}
-                <div className="hidden lg:block lg:col-span-3">
-                  <div className="sticky top-6 space-y-6">
-                    {/* SIDEBAR AD */}
-                    {!searchQuery && sidebarAd && (
-                      <div>
-                        <div className="text-sm text-slate-400 mb-2">Advertisement</div>
-                        <AdSlot
-                          position="sidebar"
-                          className="w-full"
-                          adCode={sidebarAd.adCode}
-                          isActive={sidebarAd.isActive}
-                          onAdLoaded={() => console.log('✅ Sidebar ad loaded')}
-                          onAdError={(err) => console.error('❌ Sidebar ad error:', err)}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* POPULAR/SIDEBAR CONTENT (Optional) */}
-                    <div className="bg-slate-800/50 rounded-lg p-4 border border-slate-700">
-                      <h3 className="text-lg font-semibold text-white mb-3">🔥 Trending Now</h3>
-                      <div className="space-y-3">
-                        {filteredAnime.slice(0, 5).map((anime, index) => (
-                          <div 
-                            key={`trending-${anime.id}`}
-                            className="flex items-center space-x-3 p-2 hover:bg-slate-700/50 rounded cursor-pointer"
-                            onClick={() => onAnimeSelect(anime)}
-                          >
-                            <span className="text-xs text-slate-400 w-5">#{index + 1}</span>
-                            <img 
-                              src={anime.thumbnail} 
-                              alt={anime.title}
-                              className="w-10 h-14 object-cover rounded"
-                              onError={(e) => {
-                                const target = e.target as HTMLImageElement;
-                                target.src = 'https://via.placeholder.com/100x140/1a202c/667eea?text=Anime';
-                              }}
-                            />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-medium text-white truncate">{anime.title}</p>
-                              <p className="text-xs text-slate-400">{anime.contentType}</p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </div>
+              {/* ALL ANIME CARDS IN SINGLE GRID */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3">
+                {filteredAnime.map((anime, index) => (
+                  <AnimeCard
+                    key={anime.id || anime._id}
+                    anime={anime}
+                    onClick={onAnimeSelect}
+                    index={index}
+                  />
+                ))}
               </div>
+                  
+              {/* LOAD MORE SECTION */}
+              {hasMore && !searchQuery && (
+                <div className="flex justify-center mt-8">
+                  <button
+                    onClick={loadMoreAnime}
+                    disabled={isLoadingMore}
+                    className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-8 py-3 rounded-lg transition-all duration-300 font-medium disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-900"
+                  >
+                    {isLoadingMore ? 'Loading...' : 'Load More Anime'}
+                  </button>
+                </div>
+              )}
+                  
+              {isLoadingMore && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-2 lg:gap-3 mt-4">
+                  {Array.from({ length: 6 }).map((_, index) => (
+                    <SkeletonLoader key={`more-${index}`} />
+                  ))}
+                </div>
+              )}
             </div>
           </>
         )}
       </div>
-      
-      {/* MOBILE SIDEBAR ADS - Show at bottom on mobile */}
-      {!searchQuery && sidebarAd && (
-        <div className="lg:hidden mt-8 px-4">
-          <div className="text-sm text-slate-400 mb-2 text-center">Advertisement</div>
-          <AdSlot
-            position="sidebar_mobile"
-            className="w-full"
-            adCode={sidebarAd.adCode}
-            isActive={sidebarAd.isActive}
-            onAdLoaded={() => console.log('✅ Mobile sidebar ad loaded')}
-            onAdError={(err) => console.error('❌ Mobile sidebar ad error:', err)}
-          />
-        </div>
-      )}
     </div>
   );
 };
