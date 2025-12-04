@@ -1,4 +1,4 @@
- // src/components/FeaturedAnimeCarousel.tsx - FIXED MOBILE CLICK ISSUE
+  // src/components/FeaturedAnimeCarousel.tsx - FIXED MOBILE CLICK ISSUE
 import React, { useRef, useState, useEffect } from 'react';
 import { Swiper, SwiperSlide } from 'swiper/react';
 import { Autoplay, Pagination } from 'swiper/modules';
