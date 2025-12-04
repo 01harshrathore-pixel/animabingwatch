@@ -301,20 +301,20 @@ const HomePage: React.FC<Props> = ({
           </div>
         )}
      
-        {/* MOBILE FILTER BUTTONS */}
-        <div className="mb-4 lg:hidden">
-          <div className="flex flex-nowrap gap-1 overflow-x-auto pb-1 scrollbar-hide">
+        {/* MOBILE FILTER BUTTONS - EXTRA COMPACT */}
+        <div className="mb-3 lg:hidden">
+          <div className="flex flex-nowrap gap-0.5 overflow-x-auto pb-1 scrollbar-hide">
             {filterButtons.map((filterBtn) => (
               <button
                 key={filterBtn.key}
                 onClick={() => handleFilterChange(filterBtn.key)}
                 className={`
-                  px-3 py-2 rounded-md text-xs font-medium transition-all duration-200
-                  border shadow-sm hover:shadow whitespace-nowrap flex-shrink-0
-                  transform hover:scale-105 active:scale-95 min-w-[70px] focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-slate-900
+                  px-1.5 py-1 rounded text-[10px] font-medium transition-all duration-200
+                  border whitespace-nowrap flex-shrink-0
+                  min-w-[55px] focus:outline-none focus:ring-1 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-slate-900
                   ${filter === filterBtn.key
-                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white border-transparent shadow-blue-500/20'
-                    : 'bg-slate-800/80 text-slate-300 border-slate-600 hover:border-slate-500 hover:bg-slate-700/80'
+                    ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white border-transparent shadow-inner'
+                    : 'bg-slate-800/90 text-slate-300 border-slate-700 hover:bg-slate-700/90'
                   }
                 `}
               >
