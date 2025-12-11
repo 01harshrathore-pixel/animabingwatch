@@ -1,666 +1,533 @@
-   // server.cjs - COMPLETE FIXED VERSION WITH ACTIVE AD SLOTS ROUTE
-const express = require('express');
-const cors = require('cors');
-const connectDB = require('./db.cjs');
-require('dotenv').config();
+   import type { Anime, Episode, Chapter } from '../src/types';
 
-const Analytics = require('./models/Analytics.cjs');
-const { generalLimiter, authLimiter, adminLimiter, apiLimiter } = require('./middleware/rateLimit.cjs');
+// ✅ FIX: Local development के लिए PORT 5173 है, server PORT 3000 पर है
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
 
-// ✅ IMPORT MIDDLEWARE AND ROUTES - MOVE TO TOP
-const adminAuth = require('./middleware/adminAuth.cjs');
-const animeRoutes = require('./routes/animeRoutes.cjs');
-const episodeRoutes = require('./routes/episodeRoutes.cjs');
-const chapterRoutes = require('./routes/chapterRoutes.cjs');
-const reportRoutes = require('./routes/reportRoutes.cjs');
-const socialRoutes = require('./routes/socialRoutes.cjs');
-const appDownloadRoutes = require('./routes/appDownloadRoutes.cjs');
-const adRoutes = require('./routes/adRoutes.cjs');
-const adminRoutes = require('./routes/adminRoutes.cjs');
-const contactRoutes = require('./routes/contactRoutes.cjs');
+// ✅ CACHE IMPLEMENTATION
+const cache = new Map();
+const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
 
-const app = express();
+// ✅ NEW: ADMIN FUNCTIONS
 
-app.use(cors());
-app.use(express.json());
-app.use(express.static('public'));
-
-// Database Connection
-connectDB();
-
-// ✅ RATE LIMITING MIDDLEWARE
-app.use('/api/', apiLimiter);
-app.use('/api/admin/login', authLimiter);
-app.use('/api/admin/protected', adminLimiter);
-
-// ✅ ANALYTICS TRACKING MIDDLEWARE
-app.use((req, res, next) => {
-  if (req.path === '/' || 
-      req.path.includes('/anime') || 
-      req.path.includes('/api/anime') ||
-      req.path.includes('/search')) {
-    Analytics.recordVisit(req, 0);
-  }
-  next();
-});
-
-// ✅ FIXED ADMIN CREATION FUNCTION
-const createAdmin = async () => {
+/**
+ * ✅ GET ALL ANIME FOR ADMIN DASHBOARD
+ */
+export const getAdminAnimeList = async (
+  page: number = 1, 
+  limit: number = 50, 
+  search: string = '',
+  contentType: string = '',
+  status: string = ''
+): Promise<any[]> => {
   try {
-    const Admin = require('./models/Admin.cjs');
-    const bcrypt = require('bcryptjs');
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
-    const username = process.env.ADMIN_USER || 'Hellobrother';
-    const password = process.env.ADMIN_PASS || 'Anime2121818144';
-    
-    console.log('🔄 Checking admin user...');
-    
-    let admin = await Admin.findOne({ username });
-    
-    if (!admin) {
-      console.log('🆕 Creating new admin user...');
-      const hashedPassword = await bcrypt.hash(password, 12);
-      
-      admin = await Admin.create({
-        username: username,
-        password: hashedPassword,
-        email: 'admin@animabing.com',
-        role: 'admin'
-      });
-      
-      console.log('✅ Admin user created successfully!');
-    } else {
-      console.log('✅ Admin user already exists');
-      
-      // Update password to ensure it's correct
-      const hashedPassword = await bcrypt.hash(password, 12);
-      admin.password = hashedPassword;
-      await admin.save();
-      console.log('🔁 Admin password updated');
+    if (!token) {
+      throw new Error('Admin token not found');
     }
     
-    console.log('=================================');
-    console.log('🔑 ADMIN LOGIN CREDENTIALS:');
-    console.log('   Username:', username);
-    console.log('   Password:', password);
-    console.log('   Login URL: http://localhost:5173');
-    console.log('   Press Ctrl+Shift+Alt for admin button');
-    console.log('=================================');
+    let url = `${API_BASE}/anime/admin/list?page=${page}&limit=${limit}`;
     
-  } catch (err) {
-    console.error('❌ ADMIN CREATION ERROR:', err);
-    console.log('💡 TROUBLESHOOTING:');
-    console.log('1. Check MongoDB connection');
-    console.log('2. Check bcrypt installation: npm install bcryptjs');
-    console.log('3. Check environment variables in .env file');
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+    if (contentType && contentType !== 'All') {
+      url += `&contentType=${encodeURIComponent(contentType)}`;
+    }
+    if (status && status !== 'All') {
+      url += `&status=${encodeURIComponent(status)}`;
+    }
+    
+    console.log('📡 Fetching admin anime from:', url);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.status === 401) {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('token');
+      window.location.href = '/admin/login';
+      throw new Error('Session expired');
+    }
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const animeData = await response.json();
+    
+    console.log(`✅ Admin loaded ${animeData?.length || 0} anime`);
+    return animeData || [];
+    
+  } catch (error) {
+    console.error('❌ Error in getAdminAnimeList:', error);
+    throw error;
   }
 };
-createAdmin();
 
-// ✅ EMERGENCY ADMIN RESET ROUTE
-app.get('/api/admin/emergency-reset', async (req, res) => {
+/**
+ * ✅ UPDATE ANIME STATUS
+ */
+export const updateAnimeStatus = async (animeId: string, isActive: boolean): Promise<boolean> => {
   try {
-    const Admin = require('./models/Admin.cjs');
-    const bcrypt = require('bcryptjs');
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
     
-    console.log('🆕 EMERGENCY ADMIN RESET INITIATED...');
-    
-    // Delete any existing admin
-    await Admin.deleteMany({});
-    console.log('✅ Cleared existing admin users');
-    
-    // Create new admin with hashed password
-    const hashedPassword = await bcrypt.hash('Anime2121818144', 12);
-    const admin = new Admin({
-      username: 'Hellobrother',
-      password: hashedPassword,
-      email: 'admin@animabing.com',
-      role: 'superadmin'
-    });
-    
-    await admin.save();
-    console.log('✅ EMERGENCY ADMIN CREATED SUCCESSFULLY!');
-    
-    res.json({ 
-      success: true, 
-      message: '✅ EMERGENCY: Admin account created successfully!',
-      credentials: {
-        username: 'Hellobrother',
-        password: 'Anime2121818144'
+    const response = await fetch(`${API_BASE}/anime/admin/status/${animeId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
       },
-      instructions: 'Use these credentials to login at /admin route'
+      body: JSON.stringify({ isActive })
     });
     
-  } catch (error) {
-    console.error('❌ EMERGENCY ADMIN RESET ERROR:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message,
-      details: 'Check MongoDB connection and bcrypt installation'
-    });
-  }
-});
-
-// ✅ ADMIN DEBUG ROUTE
-app.get('/api/admin/debug', async (req, res) => {
-  try {
-    const Admin = require('./models/Admin.cjs');
-    
-    const adminCount = await Admin.countDocuments();
-    const allAdmins = await Admin.find().select('username email createdAt');
-    
-    console.log('🔍 ADMIN DEBUG INFO:');
-    console.log('Total Admins:', adminCount);
-    console.log('Admin List:', allAdmins);
-    
-    res.json({
-      success: true,
-      totalAdmins: adminCount,
-      admins: allAdmins,
-      serverTime: new Date().toISOString(),
-      nodeVersion: process.version,
-      environment: process.env.NODE_ENV || 'development'
-    });
-    
-  } catch (error) {
-    console.error('Admin debug error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
-  }
-});
-
-// ✅ EMERGENCY ADMIN CREATION ROUTE
-app.get('/api/admin/create-default-admin', async (req, res) => {
-  try {
-    const Admin = require('./models/Admin.cjs');
-    const bcrypt = require('bcryptjs');
-    
-    console.log('🆕 EMERGENCY: Creating default admin user...');
-    
-    // Delete existing admin if any
-    await Admin.deleteMany({ username: 'Hellobrother' });
-    
-    // Create new admin
-    const hashedPassword = await bcrypt.hash('Anime2121818144', 12);
-    const admin = new Admin({
-      username: 'Hellobrother',
-      password: hashedPassword,
-      email: 'admin@animabing.com',
-      role: 'admin'
-    });
-    
-    await admin.save();
-    
-    console.log('✅ EMERGENCY ADMIN CREATED:', admin.username);
-    
-    res.json({ 
-      success: true, 
-      message: '✅ EMERGENCY: Admin created successfully!',
-      credentials: {
-        username: 'Hellobrother',
-        password: 'Anime2121818144'
-      },
-      instructions: 'Use these credentials to login at your frontend admin panel'
-    });
-  } catch (error) {
-    console.error('❌ EMERGENCY Admin creation error:', error);
-    res.status(500).json({ 
-      success: false, 
-      error: error.message,
-      stack: error.stack 
-    });
-  }
-});
-
-// ✅ FIXED ADMIN LOGIN ROUTE
-app.post('/api/admin/login', async (req, res) => {
-  try {
-    const { username, password } = req.body;
-    
-    console.log('\n🔐 LOGIN ATTEMPT:', { 
-      username, 
-      hasPassword: !!password,
-      timestamp: new Date().toISOString()
-    });
-    
-    // Input validation
-    if (!username || !password) {
-      return res.status(400).json({ 
-        success: false,
-        error: 'Username and password required' 
-      });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
     }
-
-    const Admin = require('./models/Admin.cjs');
-    const bcrypt = require('bcryptjs');
     
-    // Find admin
-    const admin = await Admin.findOne({ username });
-    if (!admin) {
-      console.log('❌ Admin not found:', username);
-      return res.status(401).json({ 
-        success: false,
-        error: 'Invalid username or password' 
-      });
-    }
-
-    console.log('🔑 Admin found, comparing passwords...');
+    const result = await response.json();
+    return result.success === true;
     
-    // Compare passwords
-    const isMatch = await bcrypt.compare(password, admin.password);
-    console.log('✅ Password match:', isMatch);
-    
-    if (!isMatch) {
-      return res.status(401).json({ 
-        success: false,
-        error: 'Invalid username or password' 
-      });
-    }
-
-    // Generate JWT token
-    const jwt = require('jsonwebtoken');
-    const token = jwt.sign(
-      { 
-        id: admin._id, 
-        username: admin.username,
-        role: admin.role 
-      }, 
-      process.env.JWT_SECRET || 'supersecretkey', 
-      { expiresIn: '24h' }
-    );
-
-    console.log('🎉 LOGIN SUCCESSFUL for:', username);
-    
-    res.json({ 
-      success: true, 
-      message: 'Login successful', 
-      token, 
-      username: admin.username,
-      role: admin.role
-    });
-    
-  } catch (err) {
-    console.error('❌ Login error:', err);
-    res.status(500).json({ 
-      success: false,
-      error: 'Server error during login' 
-    });
-  }
-});
-
-// ✅ AD CLICK TRACKING ROUTE
-app.post('/api/admin/protected/track-ad-click', adminAuth, async (req, res) => {
-  try {
-    const { slotId, earnings } = req.body;
-    
-    const AdSlot = require('./models/AdSlot.cjs');
-    const Analytics = require('./models/Analytics.cjs');
-    
-    const updatedSlot = await AdSlot.findByIdAndUpdate(
-      slotId,
-      {
-        $inc: {
-          clicks: 1,
-          earnings: earnings || 0.5
-        }
-      },
-      { new: true }
-    );
-
-    await Analytics.recordVisit(req, earnings || 0.5);
-
-    res.json({
-      success: true,
-      message: 'Ad click tracked',
-      adSlot: updatedSlot
-    });
   } catch (error) {
-    console.error('Ad tracking error:', error);
-    res.status(500).json({ error: 'Failed to track ad click' });
+    console.error('❌ Error updating anime status:', error);
+    return false;
   }
-});
+};
 
-// ✅ Social media API
-app.get('/api/social', async (req, res) => {
+/**
+ * ✅ DELETE ANIME
+ */
+export const deleteAnime = async (animeId: string): Promise<boolean> => {
   try {
-    const SocialMedia = require('./models/SocialMedia.cjs');
-    const socialLinks = await SocialMedia.find({ isActive: true });
-    res.json(socialLinks);
-  } catch (error) {
-    console.error('Social media API error:', error);
-    res.json([
-      {
-        platform: 'facebook',
-        url: 'https://facebook.com/animabing',
-        isActive: true,
-        icon: 'facebook',
-        displayName: 'Facebook'
-      },
-      {
-        platform: 'instagram', 
-        url: 'https://instagram.com/animabing',
-        isActive: true,
-        icon: 'instagram',
-        displayName: 'Instagram'
-      },
-      {
-        platform: 'telegram',
-        url: 'https://t.me/animabing', 
-        isActive: true,
-        icon: 'telegram',
-        displayName: 'Telegram'
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    
+    const response = await fetch(`${API_BASE}/anime/admin/${animeId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
       }
-    ]);
-  }
-});
-
-// ✅ App downloads API
-app.get('/api/app-downloads', async (req, res) => {
-  try {
-    const AppDownload = require('./models/AppDownload.cjs');
-    const appDownloads = await AppDownload.find({ isActive: true });
-    res.json(appDownloads);
-  } catch (error) {
-    console.error('App downloads API error:', error);
-    res.json([]);
-  }
-});
-
-// ✅ EPISODES BY ANIME ID ROUTE - ADDED
-app.get('/api/episodes/:animeId', async (req, res) => {
-  try {
-    const { animeId } = req.params;
-    console.log('📺 Fetching episodes for anime:', animeId);
+    });
     
-    const Episode = require('./models/Episode.cjs');
-    const episodes = await Episode.find({ animeId }).sort({ session: 1, episodeNumber: 1 });
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
-    console.log(`✅ Found ${episodes.length} episodes for anime ${animeId}`);
-    res.json(episodes);
-  } catch (error) {
-    console.error('Episodes fetch error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// ============================================
-// ✅ ADDED: PUBLIC ACTIVE AD SLOTS API ROUTE
-// ============================================
-app.get('/api/ad-slots/active', async (req, res) => {
-  try {
-    console.log('📢 Fetching active ad slots...');
-    
-    const AdSlot = require('./models/AdSlot.cjs');
-    const activeAdSlots = await AdSlot.find({ isActive: true }).sort({ position: 1 });
-    
-    console.log(`✅ Found ${activeAdSlots.length} active ad slots`);
-    
-    // If no active slots, return empty array (not error)
-    res.json(activeAdSlots);
+    const result = await response.json();
+    return result.success === true;
     
   } catch (error) {
-    console.error('❌ Error fetching active ad slots:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
+    console.error('❌ Error deleting anime:', error);
+    return false;
   }
-});
+};
 
-// ============================================
-// ✅ PROTECTED ADMIN ROUTES
-// ============================================
-app.use('/api/admin/protected', adminAuth, adminRoutes);
+// ✅ ADDED: FEATURED ANIME FUNCTION (FIXES THE MISSING FUNCTION)
+export const getFeaturedAnime = async (): Promise<Anime[]> => {
+  const cacheKey = 'featured-anime';
+  
+  // Check cache first
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log('🎯 Cache hit for featured anime');
+    return cached.data;
+  }
 
-// ============================================
-// ✅ PUBLIC ROUTES
-// ============================================
-app.use('/api/anime', animeRoutes);
-app.use('/api/episodes', episodeRoutes);
-app.use('/api/chapters', chapterRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/social', socialRoutes);
-app.use('/api/app-downloads', appDownloadRoutes);
-app.use('/api/ads', adRoutes);
-app.use('/api', contactRoutes);
-
-// ============================================
-// ✅ DEBUG ROUTES (KEEP FOR TROUBLESHOOTING)
-// ============================================
-app.get('/api/debug/episodes', async (req, res) => {
   try {
-    const Episode = require('./models/Episode.cjs');
-    const Anime = require('./models/Anime.cjs');
+    console.log('📡 Fetching featured anime from API...');
     
-    const allEpisodes = await Episode.find().populate('animeId', 'title');
+    const response = await fetch(`${API_BASE}/anime/featured`);
     
-    console.log('📋 ALL EPISODES IN DATABASE:');
-    allEpisodes.forEach(ep => {
-      console.log(`- ${ep.animeId?.title || 'NO ANIME'} | EP ${ep.episodeNumber} | Session ${ep.session} | AnimeID: ${ep.animeId?._id}`);
-    });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
     
-    res.json({
-      totalEpisodes: allEpisodes.length,
-      episodes: allEpisodes
-    });
-  } catch (error) {
-    console.error('Debug error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+    const result = await response.json();
+    let featuredData = [];
+    
+    if (result.success && Array.isArray(result.data)) {
+      featuredData = result.data.map((anime: any) => ({
+        ...anime,
+        id: anime._id || anime.id,
+        lastUpdated: anime.updatedAt ? new Date(anime.updatedAt).getTime() : Date.now()
+      }));
+    }
 
-app.get('/api/debug/anime/:animeId', async (req, res) => {
+    // Store in cache
+    cache.set(cacheKey, {
+      data: featuredData,
+      timestamp: Date.now()
+    });
+
+    console.log(`✅ Loaded ${featuredData.length} featured anime`);
+    return featuredData;
+  } catch (error) {
+    console.error('❌ Error in getFeaturedAnime:', error);
+    return [];
+  }
+};
+
+// ✅ UPDATED: Paginated API calls with fields parameter
+export const getAnimePaginated = async (page: number = 1, limit: number = 24, fields?: string): Promise<Anime[]> => {
+  const cacheKey = `anime-page-${page}-${limit}-${fields || 'default'}`;
+  
+  // Check cache first
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    console.log(`🎯 Cache hit for page ${page}`);
+    return cached.data;
+  }
+
   try {
-    const Anime = require('./models/Anime.cjs');
-    const Episode = require('./models/Episode.cjs');
+    console.log(`📡 Fetching page ${page} from API...`);
     
-    const animeId = req.params.animeId;
-    const anime = await Anime.findById(animeId);
-    const episodes = await Episode.find({ animeId });
+    // Build URL with optional fields parameter
+    let url = `${API_BASE}/anime?page=${page}&limit=${limit}`;
+    if (fields) {
+      url += `&fields=${encodeURIComponent(fields)}`;
+    }
     
-    console.log('🔍 DEBUG ANIME:');
-    console.log('Anime Title:', anime?.title);
-    console.log('Anime ID:', anime?._id);
-    console.log('Requested ID:', animeId);
-    console.log('Episodes found:', episodes.length);
+    const response = await fetch(url);
     
-    res.json({
-      anime: anime,
-      episodes: episodes,
-      animeId: animeId,
-      episodesCount: episodes.length
-    });
-  } catch (error) {
-    console.error('Debug error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    const result = await response.json();
+    let animeData = [];
+    
+    if (result.success && Array.isArray(result.data)) {
+      animeData = result.data.map((anime: any) => ({
+        ...anime,
+        id: anime._id || anime.id,
+        lastUpdated: anime.updatedAt ? new Date(anime.updatedAt).getTime() : Date.now()
+      }));
+    }
 
-app.get('/api/debug/animes', async (req, res) => {
+    // Store in cache
+    cache.set(cacheKey, {
+      data: animeData,
+      timestamp: Date.now()
+    });
+
+    console.log(`✅ Loaded ${animeData.length} anime for page ${page}`);
+    return animeData;
+  } catch (error) {
+    console.error('❌ Error in getAnimePaginated:', error);
+    return [];
+  }
+};
+
+// ✅ UPDATED: Search function with fields parameter
+export const searchAnime = async (query: string, fields?: string): Promise<Anime[]> => {
+  const cacheKey = `search-${query}-${fields || 'default'}`;
+  
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
   try {
-    const Anime = require('./models/Anime.cjs');
-    const animes = await Anime.find().select('title _id contentType');
+    if (!query.trim()) return await getAllAnime(fields);
     
-    console.log('📺 ALL ANIMES IN DATABASE:');
-    animes.forEach(anime => {
-      console.log(`- ${anime.title} | ID: ${anime._id} | Type: ${anime.contentType}`);
-    });
+    // Build URL with optional fields parameter
+    let url = `${API_BASE}/anime/search?query=${encodeURIComponent(query)}`;
+    if (fields) {
+      url += `&fields=${encodeURIComponent(fields)}`;
+    }
     
-    res.json({
-      totalAnimes: animes.length,
-      animes: animes
-    });
-  } catch (error) {
-    console.error('Debug error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+    const response = await fetch(url);
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    
+    const result = await response.json();
+    let searchData = [];
+    
+    if (result.success && Array.isArray(result.data)) {
+      searchData = result.data.map((anime: any) => ({
+        ...anime,
+        id: anime._id || anime.id,
+        lastUpdated: anime.updatedAt ? new Date(anime.updatedAt).getTime() : Date.now()
+      }));
+    }
 
-// ✅ DEBUG AD SLOTS ROUTE
-app.get('/api/debug/ad-slots', async (req, res) => {
+    cache.set(cacheKey, {
+      data: searchData,
+      timestamp: Date.now()
+    });
+
+    return searchData;
+  } catch (error) {
+    console.error('❌ Error in searchAnime:', error);
+    return [];
+  }
+};
+
+// ✅ UPDATED: Get anime by ID with fields parameter
+export const getAnimeById = async (id: string, fields?: string): Promise<Anime | null> => {
+  const cacheKey = `anime-${id}-${fields || 'default'}`;
+  
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
   try {
-    const AdSlot = require('./models/AdSlot.cjs');
+    // Build URL with optional fields parameter
+    let url = `${API_BASE}/anime/${id}`;
+    if (fields) {
+      url += `?fields=${encodeURIComponent(fields)}`;
+    }
     
-    const adSlots = await AdSlot.find();
+    const response = await fetch(url);
     
-    console.log('📢 DEBUG AD SLOTS:');
-    console.log(`Total ad slots: ${adSlots.length}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
     
-    adSlots.forEach(slot => {
-      console.log(`- ${slot.name} (${slot.position}): Active=${slot.isActive}, Impressions=${slot.impressions}, Clicks=${slot.clicks}, Earnings=₹${slot.earnings}`);
-    });
+    const result = await response.json();
     
-    res.json({
-      success: true,
-      totalSlots: adSlots.length,
-      adSlots: adSlots
-    });
+    if (result.success && result.data) {
+      const animeData = {
+        ...result.data,
+        id: result.data._id || result.data.id
+      };
+      
+      // Store in cache
+      cache.set(cacheKey, {
+        data: animeData,
+        timestamp: Date.now()
+      });
+      
+      return animeData;
+    }
+    return null;
   } catch (error) {
-    console.error('❌ Debug ad slots error:', error);
-    res.status(500).json({ 
-      success: false,
-      error: error.message 
-    });
+    console.error('❌ Error fetching anime by id:', error);
+    return null;
   }
-});
+};
 
-// ✅ HEALTH CHECK
-app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'OK', 
-    message: 'Animabing Server Running',
-    timestamp: new Date().toISOString()
+// ✅ UPDATED: Get all anime with fields parameter
+export const getAllAnime = async (fields?: string): Promise<Anime[]> => {
+  return getAnimePaginated(1, 50, fields); // First page with more items
+};
+
+// ✅ UPDATED: Get episodes by anime ID (now returns proper Episode type)
+export const getEpisodesByAnimeId = async (animeId: string): Promise<Episode[]> => {
+  const cacheKey = `episodes-${animeId}`;
+  
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/episodes/${animeId}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const episodes = await response.json();
+    
+    // ✅ Transform the data to match Episode type with downloadLinks
+    const transformedEpisodes: Episode[] = episodes.map((episode: any) => ({
+      episodeId: episode._id,
+      _id: episode._id,
+      episodeNumber: episode.episodeNumber,
+      title: episode.title || `Episode ${episode.episodeNumber}`,
+      downloadLinks: episode.downloadLinks || [], // ✅ Use downloadLinks instead of cutyLink
+      secureFileReference: episode.secureFileReference || '',
+      session: episode.session || 1
+    }));
+    
+    // Store in cache
+    cache.set(cacheKey, {
+      data: transformedEpisodes,
+      timestamp: Date.now()
+    });
+    
+    return transformedEpisodes;
+  } catch (error) {
+    console.error('❌ Error fetching episodes:', error);
+    return [];
+  }
+};
+
+// ✅ UPDATED: Get chapters by manga ID (now returns proper Chapter type)
+export const getChaptersByMangaId = async (mangaId: string): Promise<Chapter[]> => {
+  const cacheKey = `chapters-${mangaId}`;
+  
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE}/chapters/${mangaId}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const chapters = await response.json();
+    
+    // ✅ Transform the data to match Chapter type with downloadLinks
+    const transformedChapters: Chapter[] = chapters.map((chapter: any) => ({
+      chapterId: chapter._id,
+      _id: chapter._id,
+      chapterNumber: chapter.chapterNumber,
+      title: chapter.title || `Chapter ${chapter.chapterNumber}`,
+      downloadLinks: chapter.downloadLinks || [], // ✅ Use downloadLinks instead of cutyLink
+      secureFileReference: chapter.secureFileReference || '',
+      session: chapter.session || 1
+    }));
+    
+    // Store in cache
+    cache.set(cacheKey, {
+      data: transformedChapters,
+      timestamp: Date.now()
+    });
+    
+    return transformedChapters;
+  } catch (error) {
+    console.error('❌ Error fetching chapters:', error);
+    return [];
+  }
+};
+
+// ✅ FIXED: Get download links for a specific episode (using query parameter)
+export const getEpisodeDownloadLinks = async (animeId: string, episodeNumber: number, session?: number): Promise<Episode | null> => {
+  const cacheKey = `episode-links-${animeId}-${episodeNumber}-${session || 1}`;
+  
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  try {
+    // ✅ FIXED: Use query parameter for session instead of path parameter
+    let url = `${API_BASE}/episodes/download/${animeId}/${episodeNumber}`;
+    if (session && session !== 1) {
+      url += `?session=${session}`;
+    }
+    
+    console.log('📥 Fetching episode download links from:', url);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result) {
+      const episodeData: Episode = {
+        episodeId: result._id,
+        _id: result._id,
+        episodeNumber: result.episodeNumber,
+        title: result.title || `Episode ${result.episodeNumber}`,
+        downloadLinks: result.downloadLinks || [],
+        secureFileReference: result.secureFileReference || '',
+        session: result.session || 1
+      };
+      
+      // Store in cache
+      cache.set(cacheKey, {
+        data: episodeData,
+        timestamp: Date.now()
+      });
+      
+      return episodeData;
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Error fetching episode download links:', error);
+    return null;
+  }
+};
+
+// ✅ FIXED: Get download links for a specific chapter (using query parameter)
+export const getChapterDownloadLinks = async (mangaId: string, chapterNumber: number, session?: number): Promise<Chapter | null> => {
+  const cacheKey = `chapter-links-${mangaId}-${chapterNumber}-${session || 1}`;
+  
+  const cached = cache.get(cacheKey);
+  if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+    return cached.data;
+  }
+
+  try {
+    // ✅ FIXED: Use query parameter for session instead of path parameter
+    let url = `${API_BASE}/chapters/download/${mangaId}/${chapterNumber}`;
+    if (session && session !== 1) {
+      url += `?session=${session}`;
+    }
+    
+    console.log('📥 Fetching chapter download links from:', url);
+    
+    const response = await fetch(url);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result) {
+      const chapterData: Chapter = {
+        chapterId: result._id,
+        _id: result._id,
+        chapterNumber: result.chapterNumber,
+        title: result.title || `Chapter ${result.chapterNumber}`,
+        downloadLinks: result.downloadLinks || [],
+        secureFileReference: result.secureFileReference || '',
+        session: result.session || 1
+      };
+      
+      // Store in cache
+      cache.set(cacheKey, {
+        data: chapterData,
+        timestamp: Date.now()
+      });
+      
+      return chapterData;
+    }
+    return null;
+  } catch (error) {
+    console.error('❌ Error fetching chapter download links:', error);
+    return null;
+  }
+};
+
+// ✅ Clear cache function
+export const clearAnimeCache = () => {
+  cache.clear();
+  console.log('🗑️ Anime cache cleared');
+};
+
+// ✅ Clear specific cache entries
+export const clearEpisodeCache = (animeId: string) => {
+  const keysToDelete: string[] = [];
+  
+  cache.forEach((value, key) => {
+    if (key.includes(`episodes-${animeId}`) || key.includes(`episode-links-${animeId}`)) {
+      keysToDelete.push(key);
+    }
   });
-});
+  
+  keysToDelete.forEach(key => cache.delete(key));
+  console.log(`🗑️ Cleared ${keysToDelete.length} episode cache entries for anime ${animeId}`);
+};
 
-// ✅ EMERGENCY: SET ALL ANIME AS FEATURED ROUTE
-app.get('/api/emergency/set-all-featured', async (req, res) => {
-  try {
-    const Anime = require('./models/Anime.cjs');
-    
-    console.log('🆕 EMERGENCY: Setting ALL anime as featured...');
-    
-    const result = await Anime.updateMany(
-      {}, 
-      { 
-        $set: { 
-          featured: true,
-          featuredOrder: 1 
-        } 
-      }
-    );
-    
-    console.log(`✅ Set ${result.modifiedCount} anime as featured`);
-    
-    const featuredAnime = await Anime.find({ featured: true })
-      .select('title featured featuredOrder')
-      .limit(10)
-      .lean();
-    
-    res.json({ 
-      success: true, 
-      message: `Set ${result.modifiedCount} anime as featured`,
-      modifiedCount: result.modifiedCount,
-      sampleFeatured: featuredAnime
-    });
-    
-  } catch (error) {
-    console.error('❌ Emergency featured error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// ============================================
-// ✅ ROOT ROUTE
-// ============================================
-app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Animabing - Anime & Movies</title>
-      <style>
-        body {
-          background: #0a0c1c;
-          color: white;
-          font-family: Arial, sans-serif;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          margin: 0;
-        }
-        .container {
-          text-align: center;
-          padding: 2rem;
-        }
-        h1 {
-          color: #8B5CF6;
-          margin-bottom: 1rem;
-        }
-        a {
-          color: #8B5CF6;
-          text-decoration: none;
-          font-weight: bold;
-          margin: 0 10px;
-        }
-        a:hover {
-          text-decoration: underline;
-        }
-        .emergency-info {
-          background: #1a1c2c;
-          padding: 1rem;
-          border-radius: 8px;
-          margin: 1rem 0;
-          text-align: left;
-        }
-        .ad-info {
-          background: #2a1c4c;
-          padding: 1rem;
-          border-radius: 8px;
-          margin: 1rem 0;
-          text-align: left;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h1>Animabing Server</h1>
-        <p>✅ Backend API is running correctly</p>
-        <p>📺 Frontend: <a href="https://rainbow-sfogliatella-b724c0.netlify.app" target="_blank">Netlify</a></p>
-        <p>⚙️ Admin Access: Press Ctrl+Shift+Alt on the frontend</p>
-        
-        <div class="ad-info">
-          <h3>📢 Ad Management:</h3>
-          <p>Active Ad Slots: <a href="/api/ad-slots/active" target="_blank">Check Active Ads</a></p>
-          <p>All Ad Slots: <a href="/api/debug/ad-slots" target="_blank">Debug Ad Slots</a></p>
-          <p>Admin Panel: <a href="/admin" target="_blank">Go to Admin</a></p>
-        </div>
-        
-        <div class="emergency-info">
-          <h3>🔧 Emergency Featured Fix:</h3>
-          <p>Click below to set all anime as featured:</p>
-          <p><a href="/api/emergency/set-all-featured" target="_blank">Set All Anime as Featured</a></p>
-        </div>
-        
-        <p><a href="/api/health">Health Check</a> | <a href="/api/anime/featured">Check Featured</a></p>
-      </div>
-    </body>
-    </html>
-  `);
-});
-
-// ✅ START SERVER
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔧 Admin: ${process.env.ADMIN_USER} / ${process.env.ADMIN_PASS}`);
-  console.log(`🌐 Frontend: https:// animabingwatch.page.dev`);
-  console.log(`🔗 API: https://https://animabingwatch-y20k.onrender.com/api`);
-  console.log(`📢 Active Ad Slots:  https://animabingwatch-y20k.onrender.com/api/ad-slots/active`);
-  console.log(`🆕 Emergency Route:  https://animabingwatch-y20k.onrender.com/api/emergency/set-all-featured`);
-});
+export const clearChapterCache = (mangaId: string) => {
+  const keysToDelete: string[] = [];
+  
+  cache.forEach((value, key) => {
+    if (key.includes(`chapters-${mangaId}`) || key.includes(`chapter-links-${mangaId}`)) {
+      keysToDelete.push(key);
+    }
+  });
+  
+  keysToDelete.forEach(key => cache.delete(key));
+  console.log(`🗑️ Cleared ${keysToDelete.length} chapter cache entries for manga ${mangaId}`);
+};
