@@ -1,5 +1,4 @@
- // services/animeServices.ts - FIXED VERSION
-import type { Anime, Episode, Chapter } from '../src/types';
+  import type { Anime, Episode, Chapter } from '../src/types';
 
 // ✅ FIX: Local development के लिए PORT 5173 है, server PORT 3000 पर है
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
@@ -7,6 +6,124 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
 // ✅ CACHE IMPLEMENTATION
 const cache = new Map();
 const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+
+// ✅ NEW: ADMIN FUNCTIONS
+
+/**
+ * ✅ GET ALL ANIME FOR ADMIN DASHBOARD
+ */
+export const getAdminAnimeList = async (
+  page: number = 1, 
+  limit: number = 50, 
+  search: string = '',
+  contentType: string = '',
+  status: string = ''
+): Promise<any[]> => {
+  try {
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    
+    if (!token) {
+      throw new Error('Admin token not found');
+    }
+    
+    let url = `${API_BASE}/anime/admin/list?page=${page}&limit=${limit}`;
+    
+    if (search) {
+      url += `&search=${encodeURIComponent(search)}`;
+    }
+    if (contentType && contentType !== 'All') {
+      url += `&contentType=${encodeURIComponent(contentType)}`;
+    }
+    if (status && status !== 'All') {
+      url += `&status=${encodeURIComponent(status)}`;
+    }
+    
+    console.log('📡 Fetching admin anime from:', url);
+    
+    const response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (response.status === 401) {
+      localStorage.removeItem('adminToken');
+      localStorage.removeItem('token');
+      window.location.href = '/admin/login';
+      throw new Error('Session expired');
+    }
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const animeData = await response.json();
+    
+    console.log(`✅ Admin loaded ${animeData?.length || 0} anime`);
+    return animeData || [];
+    
+  } catch (error) {
+    console.error('❌ Error in getAdminAnimeList:', error);
+    throw error;
+  }
+};
+
+/**
+ * ✅ UPDATE ANIME STATUS
+ */
+export const updateAnimeStatus = async (animeId: string, isActive: boolean): Promise<boolean> => {
+  try {
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    
+    const response = await fetch(`${API_BASE}/anime/admin/status/${animeId}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ isActive })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result.success === true;
+    
+  } catch (error) {
+    console.error('❌ Error updating anime status:', error);
+    return false;
+  }
+};
+
+/**
+ * ✅ DELETE ANIME
+ */
+export const deleteAnime = async (animeId: string): Promise<boolean> => {
+  try {
+    const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
+    
+    const response = await fetch(`${API_BASE}/anime/admin/${animeId}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const result = await response.json();
+    return result.success === true;
+    
+  } catch (error) {
+    console.error('❌ Error deleting anime:', error);
+    return false;
+  }
+};
 
 // ✅ ADDED: FEATURED ANIME FUNCTION (FIXES THE MISSING FUNCTION)
 export const getFeaturedAnime = async (): Promise<Anime[]> => {
