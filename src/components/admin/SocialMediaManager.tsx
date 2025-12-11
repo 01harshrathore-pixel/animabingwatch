@@ -1,6 +1,5 @@
- // src/components/admin/SocialMediaManager.tsx - UPDATED WITH REAL SVG ICONS
+  // src/components/admin/SocialMediaManager.tsx - FIXED VERSION
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import Spinner from '../Spinner';
 
 interface SocialMedia {
@@ -13,7 +12,6 @@ interface SocialMedia {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
-const token = localStorage.getItem('adminToken') || '';
 
 const SocialMediaManager: React.FC = () => {
   const [socialLinks, setSocialLinks] = useState<SocialMedia[]>([]);
@@ -33,12 +31,69 @@ const SocialMediaManager: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(`${API_BASE}/admin/protected/social-media`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const token = localStorage.getItem('adminToken') || '';
+      
+      if (!token) {
+        throw new Error('Admin token not found. Please login again.');
+      }
+      
+      console.log('📡 Fetching social media links...');
+      
+      const response = await fetch(`${API_BASE}/admin/protected/social-media`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-      setSocialLinks(data);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📋 Social Media API Response:', data);
+      
+      // ✅ FIX: Handle both response formats
+      let linksData = [];
+      
+      if (Array.isArray(data)) {
+        linksData = data;
+      } else if (data && data.success && Array.isArray(data.data)) {
+        linksData = data.data;
+      } else if (data && Array.isArray(data.links)) {
+        linksData = data.links;
+      } else {
+        console.warn('⚠️ Unexpected response format, defaulting to empty array');
+        linksData = [];
+      }
+      
+      console.log(`✅ Loaded ${linksData.length} social media links`);
+      setSocialLinks(linksData);
+      
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load social media links');
+      console.error('❌ Error fetching social media links:', err);
+      
+      // Try public endpoint as fallback
+      try {
+        console.log('🔄 Trying public social media endpoint...');
+        const fallbackResponse = await fetch(`${API_BASE}/social`);
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          
+          if (Array.isArray(fallbackData)) {
+            setSocialLinks(fallbackData);
+          } else {
+            setSocialLinks([]);
+          }
+        } else {
+          setSocialLinks([]);
+        }
+      } catch (fallbackErr) {
+        console.error('❌ Fallback also failed:', fallbackErr);
+        setError('Failed to load social media links. Please check your connection.');
+        setSocialLinks([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -57,29 +112,66 @@ const SocialMediaManager: React.FC = () => {
     if (!editingLink) return;
 
     try {
-      await axios.put(`${API_BASE}/admin/protected/social-media/${editingLink.platform}`, 
-        editForm,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const token = localStorage.getItem('adminToken') || '';
       
-      alert('Social media link updated successfully!');
+      if (!token) {
+        throw new Error('Admin token not found. Please login again.');
+      }
+      
+      console.log(`📝 Updating ${editingLink.platform} link...`);
+      
+      const response = await fetch(`${API_BASE}/admin/protected/social-media/${editingLink.platform}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(editForm)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Update failed');
+      }
+      
+      alert('✅ Social media link updated successfully!');
       setEditingLink(null);
       fetchSocialLinks();
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Update failed');
+      console.error('❌ Error updating social media link:', err);
+      alert(err.message || 'Update failed');
     }
   };
 
   const toggleActive = async (link: SocialMedia) => {
     try {
-      await axios.put(`${API_BASE}/admin/protected/social-media/${link.platform}`, 
-        { ...link, isActive: !link.isActive },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const token = localStorage.getItem('adminToken') || '';
+      
+      if (!token) {
+        throw new Error('Admin token not found. Please login again.');
+      }
+      
+      console.log(`🔄 Toggling ${link.platform} active state...`);
+      
+      const response = await fetch(`${API_BASE}/admin/protected/social-media/${link.platform}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ ...link, isActive: !link.isActive })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update');
+      }
       
       fetchSocialLinks();
+      alert(`✅ ${link.displayName} is now ${!link.isActive ? 'active' : 'inactive'}!`);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update');
+      console.error('❌ Error toggling social media link:', err);
+      alert(err.message || 'Failed to update');
     }
   };
 
@@ -94,7 +186,7 @@ const SocialMediaManager: React.FC = () => {
     }
   };
 
-  // Real SVG Icons for Social Media (with currentColor for theme integration)
+  // Real SVG Icons for Social Media
   const SocialIcon = ({ platform, className = "w-6 h-6" }: { platform: string; className?: string }) => {
     switch (platform) {
       case 'facebook':
