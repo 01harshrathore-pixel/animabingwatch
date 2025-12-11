@@ -660,7 +660,7 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔧 Admin: ${process.env.ADMIN_USER} / ${process.env.ADMIN_PASS}`);
   console.log(`🌐 Frontend: https:// animabingwatch.page.dev`);
-  console.log(`🔗 API: https://animabingwatch.onrender.com/api`);
-  console.log(`📢 Active Ad Slots: https://animabingwatch.onrender.com/api/ad-slots/active`);
-  console.log(`🆕 Emergency Route: https://animabingwatch.onrender.com/api/emergency/set-all-featured`);
+  console.log(`🔗 API: https:// https://animabingwatch-y20k.onrender.com/api`);
+  console.log(`📢 Active Ad Slots: https:// https://animabingwatch-y20k.onrender.com/api/ad-slots/active`);
+  console.log(`🆕 Emergency Route: https:// https://animabingwatch-y20k.onrender.com/api/emergency/set-all-featured`);
 });
