@@ -1,11 +1,237 @@
-  const express = require('express');
+ // routes/animeRoutes.cjs - FIXED VERSION
+const express = require('express');
 const router = express.Router();
 const Anime = require('../models/Anime.cjs');
-const adminAuth = require('../middleware/adminAuth.cjs'); // ✅ Add this
+const adminAuth = require('../middleware/adminAuth.cjs');
 
 /**
- * ✅ NEW: ADMIN ROUTE - GET ALL ANIME FOR ADMIN DASHBOARD
- * This route requires admin authentication
+ * ✅ FIXED: FEATURED ANIME ROUTE
+ */
+router.get('/featured', async (req, res) => {
+  try {
+    console.log('📢 Fetching featured anime...');
+    
+    // Get featured anime or fallback to active anime
+    let featuredAnime = await Anime.find({ 
+      $or: [
+        { featured: true },
+        { isActive: { $ne: false } }
+      ]
+    })
+    .select('_id title thumbnail bannerImage releaseYear subDubStatus contentType rating views featured featuredOrder')
+    .sort({ featuredOrder: -1, updatedAt: -1 })
+    .limit(10)
+    .lean();
+
+    console.log(`✅ Found ${featuredAnime.length} featured anime`);
+    
+    // If no featured anime, get some active anime as fallback
+    if (featuredAnime.length === 0) {
+      console.log('⚠️ No featured anime found, fetching active anime as fallback...');
+      featuredAnime = await Anime.find({ isActive: { $ne: false } })
+        .select('_id title thumbnail bannerImage releaseYear subDubStatus contentType rating views')
+        .sort({ updatedAt: -1 })
+        .limit(10)
+        .lean();
+    }
+
+    res.json({ 
+      success: true, 
+      data: featuredAnime,
+      message: `Successfully fetched ${featuredAnime.length} featured anime`
+    });
+    
+  } catch (err) {
+    console.error('❌ Error fetching featured anime:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error while fetching featured anime',
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * ✅ FIXED: GET anime with PAGINATION
+ */
+router.get('/', async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 24;
+    const skip = (page - 1) * limit;
+
+    console.log(`📄 Fetching anime page ${page}, limit ${limit}`);
+
+    // Query for active anime
+    const query = { isActive: { $ne: false } };
+    
+    const [anime, total] = await Promise.all([
+      Anime.find(query)
+        .select('_id title thumbnail releaseYear subDubStatus contentType updatedAt createdAt views')
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Anime.countDocuments(query)
+    ]);
+
+    console.log(`✅ Loaded ${anime.length} anime (page ${page} of ${Math.ceil(total / limit)})`);
+
+    res.json({ 
+      success: true, 
+      data: anime,
+      pagination: {
+        current: page,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page < Math.ceil(total / limit),
+        totalItems: total
+      }
+    });
+    
+  } catch (err) {
+    console.error('❌ Error fetching anime:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error while fetching anime',
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * ✅ FIXED: SEARCH anime with PAGINATION
+ */
+router.get('/search', async (req, res) => {
+  try {
+    const q = req.query.query || '';
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 24;
+    const skip = (page - 1) * limit;
+
+    console.log(`🔍 Searching anime for: "${q}" (page ${page})`);
+
+    if (!q.trim()) {
+      // If empty search, return first page of anime
+      const query = { isActive: { $ne: false } };
+      const found = await Anime.find(query)
+        .select('_id title thumbnail releaseYear subDubStatus contentType updatedAt createdAt')
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean();
+
+      const total = await Anime.countDocuments(query);
+
+      return res.json({ 
+        success: true, 
+        data: found,
+        pagination: {
+          current: page,
+          totalPages: Math.ceil(total / limit),
+          hasMore: page < Math.ceil(total / limit),
+          totalItems: total
+        }
+      });
+    }
+
+    const searchQuery = {
+      $and: [
+        { isActive: { $ne: false } },
+        {
+          $or: [
+            { title: { $regex: q, $options: 'i' } },
+            { description: { $regex: q, $options: 'i' } },
+            { 'genreList.name': { $regex: q, $options: 'i' } }
+          ]
+        }
+      ]
+    };
+
+    const [found, total] = await Promise.all([
+      Anime.find(searchQuery)
+        .select('_id title thumbnail releaseYear subDubStatus contentType updatedAt createdAt')
+        .sort({ updatedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Anime.countDocuments(searchQuery)
+    ]);
+
+    console.log(`✅ Found ${found.length} results for "${q}"`);
+
+    res.json({ 
+      success: true, 
+      data: found,
+      pagination: {
+        current: page,
+        totalPages: Math.ceil(total / limit),
+        hasMore: page < Math.ceil(total / limit),
+        totalItems: total
+      }
+    });
+    
+  } catch (err) {
+    console.error('❌ Error searching anime:', err);
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error while searching anime',
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * ✅ FIXED: GET single anime by ID
+ */
+router.get('/:id', async (req, res) => {
+  try {
+    const animeId = req.params.id;
+    console.log(`📺 Fetching anime details for ID: ${animeId}`);
+    
+    const item = await Anime.findOne({ 
+      _id: animeId,
+      isActive: { $ne: false }
+    });
+    
+    if (!item) {
+      console.log(`❌ Anime not found: ${animeId}`);
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Anime not found or inactive' 
+      });
+    }
+    
+    console.log(`✅ Found anime: ${item.title}`);
+    
+    // Increment views
+    await Anime.findByIdAndUpdate(animeId, { $inc: { views: 1 } });
+    
+    res.json({ 
+      success: true, 
+      data: item,
+      message: 'Anime details fetched successfully'
+    });
+    
+  } catch (err) {
+    console.error('❌ Error fetching anime by ID:', err);
+    
+    if (err.name === 'CastError') {
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Invalid anime ID format' 
+      });
+    }
+    
+    res.status(500).json({ 
+      success: false, 
+      error: 'Server error while fetching anime details',
+      details: err.message 
+    });
+  }
+});
+
+/**
+ * ✅ ADMIN ROUTE - GET ALL ANIME FOR ADMIN DASHBOARD
  */
 router.get('/admin/list', adminAuth, async (req, res) => {
   try {
@@ -34,53 +260,38 @@ router.get('/admin/list', adminAuth, async (req, res) => {
       query.status = status;
     }
     
-    // Get anime with all fields (admin needs all data)
-    const anime = await Anime.find(query)
-      .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
+    const [anime, total] = await Promise.all([
+      Anime.find(query)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Anime.countDocuments(query)
+    ]);
     
-    const total = await Anime.countDocuments(query);
+    console.log(`✅ Admin loaded ${anime.length} anime (total: ${total})`);
     
-    // Format response for admin
-    const formattedAnime = anime.map(item => ({
-      _id: item._id,
-      id: item._id,
-      title: item.title,
-      thumbnail: item.thumbnail,
-      bannerImage: item.bannerImage || '',
-      contentType: item.contentType || 'Anime',
-      status: item.status || 'Ongoing',
-      subDubStatus: item.subDubStatus || 'Hindi Sub',
-      releaseYear: item.releaseYear || new Date().getFullYear(),
-      rating: item.rating || 0,
-      description: item.description || '',
-      genreList: item.genreList || [],
-      episodes: item.episodes || [],
-      reportCount: item.reportCount || 0,
-      featured: item.featured || false,
-      views: item.views || 0,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt,
-      isActive: item.isActive !== false // Default to true if not set
-    }));
-    
-    res.json(formattedAnime); // ✅ Return array directly (as expected in AnimeListTable)
+    res.json(anime);
     
   } catch (err) {
     console.error('❌ Admin anime list error:', err);
-    res.status(500).json({ error: 'Failed to load anime list for admin' });
+    res.status(500).json({ 
+      success: false,
+      error: 'Failed to load anime list for admin',
+      details: err.message 
+    });
   }
 });
 
 /**
- * ✅ NEW: ADMIN ROUTE - UPDATE ANIME STATUS
+ * ✅ ADMIN ROUTE - UPDATE ANIME STATUS
  */
 router.put('/admin/status/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { isActive } = req.body;
+    
+    console.log(`🔄 Up anime status for ${id} to ${isActive}`);
     
     const updatedAnime = await Anime.findByIdAndUpdate(
       id,
@@ -92,7 +303,7 @@ router.put('/admin/status/:id', adminAuth, async (req, res) => {
       return res.status(404).json({ error: 'Anime not found' });
     }
     
-    res.json({ success: true, message: 'Status updated' });
+    res.json({ success: true, message: 'Status updated', anime: updatedAnime });
   } catch (err) {
     console.error('❌ Status update error:', err);
     res.status(500).json({ error: err.message });
@@ -100,11 +311,13 @@ router.put('/admin/status/:id', adminAuth, async (req, res) => {
 });
 
 /**
- * ✅ NEW: ADMIN ROUTE - DELETE ANIME
+ * ✅ ADMIN ROUTE - DELETE ANIME
  */
 router.delete('/admin/:id', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
+    
+    console.log(`🗑️ Deleting anime: ${id}`);
     
     const deletedAnime = await Anime.findByIdAndDelete(id);
     
@@ -119,135 +332,10 @@ router.delete('/admin/:id', adminAuth, async (req, res) => {
   }
 });
 
-// ✅ EXISTING CODE CONTINUES BELOW...
-// =========================================
-// DON'T MODIFY BELOW THIS LINE
-// =========================================
-
 /**
- * ✅ FIXED: FEATURED ANIME ROUTE (FIXES THE ERROR)
- * This must be added BEFORE the /:id route
+ * ✅ ADD anime to featured
  */
-router.get('/featured', async (req, res) => {
-  try {
-    // ✅ Get featured anime - using featured field from schema
-    const featuredAnime = await Anime.find({ 
-      featured: true 
-    })
-    .select('title thumbnail releaseYear subDubStatus contentType updatedAt createdAt bannerImage rating')
-    .sort({ featuredOrder: -1, createdAt: -1 })
-    .limit(10)
-    .lean();
-
-    res.json({ 
-      success: true, 
-      data: featuredAnime
-    });
-  } catch (err) {
-    console.error('Error fetching featured anime:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-/**
- * ✅ FIXED: GET anime with PAGINATION
- * Returns paginated anime from DB sorted by LATEST UPDATE
- */
-router.get('/', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 24;
-    const skip = (page - 1) * limit;
-
-    // ✅ FIXED: Only get necessary fields for listing
-    const anime = await Anime.find()
-      .select('title thumbnail releaseYear subDubStatus contentType updatedAt createdAt')
-      .sort({ updatedAt: -1 })
-      .skip(skip)
-      .limit(limit)
-      .lean();
-
-    const total = await Anime.countDocuments();
-
-    res.json({ 
-      success: true, 
-      data: anime,
-      pagination: {
-        current: page,
-        totalPages: Math.ceil(total / limit),
-        hasMore: page < Math.ceil(total / limit),
-        totalItems: total
-      }
-    });
-  } catch (err) {
-    console.error('Error fetching anime:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-/**
- * ✅ FIXED: SEARCH anime with PAGINATION
- */
-router.get('/search', async (req, res) => {
-  try {
-    const q = req.query.query || '';
-    const page = parseInt(req.query.page) || 1;
-    const limit = parseInt(req.query.limit) || 24;
-    const skip = (page - 1) * limit;
-
-    const found = await Anime.find({
-      title: { $regex: q, $options: 'i' }
-    })
-    .select('title thumbnail releaseYear subDubStatus contentType updatedAt createdAt')
-    .sort({ updatedAt: -1 })
-    .skip(skip)
-    .limit(limit)
-    .lean();
-
-    const total = await Anime.countDocuments({
-      title: { $regex: q, $options: 'i' }
-    });
-
-    res.json({ 
-      success: true, 
-      data: found,
-      pagination: {
-        current: page,
-        totalPages: Math.ceil(total / limit),
-        hasMore: page < Math.ceil(total / limit),
-        totalItems: total
-      }
-    });
-  } catch (err) {
-    console.error('Error searching anime:', err);
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-/**
- * ✅ FIXED: GET single anime by ID
- */
-router.get('/:id', async (req, res) => {
-  try {
-    const item = await Anime.findById(req.params.id);
-    if (!item) return res.status(404).json({ success: false, message: 'Anime not found' });
-    res.json({ success: true, data: item });
-  } catch (err) {
-    // ✅ Better error handling for invalid ObjectId
-    if (err.name === 'CastError') {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Invalid anime ID format' 
-      });
-    }
-    res.status(500).json({ success: false, error: err.message });
-  }
-});
-
-// ✅ ADDED: FEATURED MANAGEMENT ROUTES
-
-// Add anime to featured
-router.post('/:id/featured', async (req, res) => {
+router.post('/:id/featured', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -278,8 +366,10 @@ router.post('/:id/featured', async (req, res) => {
   }
 });
 
-// Remove anime from featured
-router.delete('/:id/featured', async (req, res) => {
+/**
+ * ✅ REMOVE anime from featured
+ */
+router.delete('/:id/featured', adminAuth, async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -307,8 +397,10 @@ router.delete('/:id/featured', async (req, res) => {
   }
 });
 
-// Update featured order (bulk update)
-router.put('/featured/order', async (req, res) => {
+/**
+ * ✅ UPDATE featured order (bulk update)
+ */
+router.put('/featured/order', adminAuth, async (req, res) => {
   try {
     const { order } = req.body; // array of anime IDs in desired order
     
