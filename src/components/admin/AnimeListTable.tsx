@@ -1,11 +1,10 @@
-  // src/components/admin/AnimeListTable.tsx - UPDATED WITH SEARCH FUNCTIONALITY
+  // AnimeListTable.tsx - INLINE EDIT VERSION
 import React, { useState, useEffect } from 'react';
 import type { Anime } from '../../types';
 import axios from 'axios';
 import Spinner from '../Spinner';
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
-const token = localStorage.getItem('adminToken') || '';
 
 const AnimeListTable: React.FC = () => {
   const [animes, setAnimes] = useState<Anime[]>([]);
@@ -15,7 +14,7 @@ const AnimeListTable: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'All' | 'Ongoing' | 'Complete'>('All');
   const [contentTypeFilter, setContentTypeFilter] = useState<'All' | 'Anime' | 'Movie' | 'Manga'>('All');
   const [searchQuery, setSearchQuery] = useState('');
-  const [editingAnime, setEditingAnime] = useState<Anime | null>(null);
+  const [editingAnimeId, setEditingAnimeId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState({
     title: '',
     description: '',
@@ -27,12 +26,16 @@ const AnimeListTable: React.FC = () => {
     contentType: 'Anime' as 'Anime' | 'Movie' | 'Manga'
   });
 
+  // ✅ FIXED: Get token correctly
+  const getToken = () => {
+    return localStorage.getItem('adminToken') || localStorage.getItem('token') || '';
+  };
+
   useEffect(() => {
     fetchAnimes();
   }, [statusFilter, contentTypeFilter]);
 
   useEffect(() => {
-    // Search functionality
     if (searchQuery.trim() === '') {
       setFilteredAnimes(animes);
     } else {
@@ -57,14 +60,45 @@ const AnimeListTable: React.FC = () => {
       if (contentTypeFilter !== 'All') params.append('contentType', contentTypeFilter);
       
       const url = `${API_BASE}/admin/protected/anime-list${params.toString() ? `?${params.toString()}` : ''}`;
-      const { data } = await axios.get(url, {
-        headers: { Authorization: `Bearer ${token}` }
+      
+      console.log('📡 Fetching anime from:', url);
+      
+      const token = getToken();
+      if (!token) {
+        setError('Admin token not found. Please login again.');
+        setLoading(false);
+        return;
+      }
+
+      const response = await axios.get(url, {
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-      const animeData = data.map((a: any) => ({ ...a, id: a._id }));
-      setAnimes(animeData);
-      setFilteredAnimes(animeData);
+
+      if (response.data && response.data.success === true) {
+        const animeData = response.data.data || [];
+        const formattedData = animeData.map((a: any) => ({ 
+          ...a, 
+          id: a._id || a.id 
+        }));
+        
+        setAnimes(formattedData);
+        setFilteredAnimes(formattedData);
+        console.log(`✅ Loaded ${formattedData.length} anime`);
+      } else {
+        setError(response.data?.error || 'Invalid response format');
+      }
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load anime');
+      console.error('❌ Error:', err);
+      if (err.response?.status === 401) {
+        localStorage.removeItem('adminToken');
+        localStorage.removeItem('token');
+        window.location.href = '/admin/login';
+        return;
+      }
+      setError(err.response?.data?.error || err.message || 'Failed to load anime');
     } finally {
       setLoading(false);
     }
@@ -74,8 +108,12 @@ const AnimeListTable: React.FC = () => {
     const animeTitle = animes.find(a => a.id === id)?.title || 'this anime';
     if (!confirm(`Delete "${animeTitle}"? This will also delete all episodes.`)) return;
     try {
+      const token = getToken();
       await axios.delete(`${API_BASE}/admin/protected/delete-anime`, {
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { 
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
         data: { id }
       });
       fetchAnimes();
@@ -85,7 +123,7 @@ const AnimeListTable: React.FC = () => {
   };
 
   const handleEdit = (anime: Anime) => {
-    setEditingAnime(anime);
+    setEditingAnimeId(anime.id);
     setEditForm({
       title: anime.title,
       description: anime.description || '',
@@ -100,17 +138,28 @@ const AnimeListTable: React.FC = () => {
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingAnime) return;
+    if (!editingAnimeId) return;
 
     try {
-      await axios.put(`${API_BASE}/admin/protected/edit-anime/${editingAnime.id}`, 
+      const token = getToken();
+      const response = await axios.put(
+        `${API_BASE}/admin/protected/edit-anime/${editingAnimeId}`, 
         editForm,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          } 
+        }
       );
       
-      alert('Anime updated successfully!');
-      setEditingAnime(null);
-      fetchAnimes();
+      if (response.data.success) {
+        alert('Anime updated successfully!');
+        setEditingAnimeId(null);
+        fetchAnimes();
+      } else {
+        alert(response.data.error || 'Update failed');
+      }
     } catch (err: any) {
       alert(err.response?.data?.error || 'Update failed');
     }
@@ -123,6 +172,20 @@ const AnimeListTable: React.FC = () => {
 
   const clearSearch = () => {
     setSearchQuery('');
+  };
+
+  const cancelEdit = () => {
+    setEditingAnimeId(null);
+    setEditForm({
+      title: '',
+      description: '',
+      thumbnail: '',
+      releaseYear: new Date().getFullYear(),
+      subDubStatus: 'Hindi Sub',
+      genreList: [''],
+      status: 'Ongoing',
+      contentType: 'Anime'
+    });
   };
 
   if (loading) return <div className="flex justify-center py-8"><Spinner size="lg" /></div>;
@@ -279,139 +342,6 @@ const AnimeListTable: React.FC = () => {
         </div>
       </div>
 
-      {/* Edit Modal */}
-      {editingAnime && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 animate-fade-in backdrop-blur-sm">
-          <div className="bg-slate-900 border border-slate-700 p-6 rounded-lg shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto animate-scale-in">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-white">Edit {editingAnime.contentType}</h3>
-              <button
-                onClick={() => setEditingAnime(null)}
-                className="text-slate-400 hover:text-white text-2xl"
-              >
-                &times;
-              </button>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Title *</label>
-                  <input
-                    type="text"
-                    value={editForm.title}
-                    onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                    required
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Content Type</label>
-                  <select
-                    value={editForm.contentType}
-                    onChange={(e) => setEditForm({ ...editForm, contentType: e.target.value as 'Anime' | 'Movie' | 'Manga' })}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                  >
-                    <option value="Anime">Anime Series</option>
-                    <option value="Movie">Movie</option>
-                    <option value="Manga">Manga</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Release Year</label>
-                  <input
-                    type="number"
-                    value={editForm.releaseYear}
-                    onChange={(e) => setEditForm({ ...editForm, releaseYear: Number(e.target.value) })}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                    min="1900"
-                    max="2030"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Sub/Dub Status</label>
-                  <select
-                    value={editForm.subDubStatus}
-                    onChange={(e) => setEditForm({ ...editForm, subDubStatus: e.target.value as Anime['subDubStatus'] })}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                  >
-                    <option value="Hindi Dub">Hindi Dub</option>
-                    <option value="Hindi Sub">Hindi Sub</option>
-                    <option value="English Sub">English Sub</option>
-                    <option value="Both">Both</option>
-                    <option value="Subbed">Subbed</option>
-                    <option value="Dubbed">Dubbed</option>
-                    <option value="Sub & Dub">Sub & Dub</option>
-                    <option value="Dual Audio">Dual Audio</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
-                  <select
-                    value={editForm.status}
-                    onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                  >
-                    <option value="Ongoing">Ongoing</option>
-                    <option value="Complete">Complete</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">Thumbnail URL</label>
-                  <input
-                    type="url"
-                    value={editForm.thumbnail}
-                    onChange={(e) => setEditForm({ ...editForm, thumbnail: e.target.value })}
-                    className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
-                <textarea
-                  value={editForm.description}
-                  onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors h-24"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">Genres (comma separated)</label>
-                <input
-                  type="text"
-                  value={editForm.genreList.join(', ')}
-                  onChange={handleGenreChange}
-                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 focus:ring-2 focus:ring-purple-500 focus:border-purple-500 transition-colors"
-                  placeholder="Action, Adventure, Fantasy"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="submit"
-                  className="bg-green-600 hover:bg-green-500 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-                >
-                  Save Changes
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setEditingAnime(null)}
-                  className="bg-slate-600 hover:bg-slate-500 text-white font-semibold py-2 px-6 rounded-lg transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       <div className="bg-slate-800/50 rounded-lg shadow-lg overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -429,90 +359,229 @@ const AnimeListTable: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-slate-700">
               {filteredAnimes.map(anime => (
-                <tr key={anime.id} className="hover:bg-slate-700/30 transition-colors">
-                  <td className="p-4 font-medium text-white">
-                    <div className="flex items-center gap-3">
-                      <img 
-                        src={anime.thumbnail} 
-                        alt={anime.title}
-                        className="w-12 h-16 object-cover rounded"
-                      />
-                      <div>
-                        <div>{anime.title}</div>
-                        <div className="text-xs text-slate-400">
-                          {anime.genreList.slice(0, 2).join(', ')}
+                <React.Fragment key={anime.id}>
+                  <tr className="hover:bg-slate-700/30 transition-colors">
+                    <td className="p-4 font-medium text-white">
+                      <div className="flex items-center gap-3">
+                        <img 
+                          src={anime.thumbnail} 
+                          alt={anime.title}
+                          className="w-12 h-16 object-cover rounded"
+                        />
+                        <div>
+                          <div>{anime.title}</div>
+                          <div className="text-xs text-slate-400">
+                            {anime.genreList.slice(0, 2).join(', ')}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </td>
-                  <td className="p-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      anime.contentType === 'Movie' 
-                        ? 'bg-blue-600 text-white' 
-                        : anime.contentType === 'Manga'
-                        ? 'bg-green-600 text-white'
-                        : 'bg-purple-600 text-white'
-                    }`}>
-                      {anime.contentType}
-                    </span>
-                  </td>
-                  <td className="p-4 text-slate-300">{anime.releaseYear}</td>
-                  <td className="p-4">
-                    <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                      anime.status === 'Complete' 
-                        ? 'bg-green-600 text-white' 
-                        : 'bg-yellow-600 text-white'
-                    }`}>
-                      {anime.status || 'Ongoing'}
-                    </span>
-                  </td>
-                  <td className="p-4">
-                    <span 
-                      className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
-                        anime.subDubStatus === 'Hindi Dub' 
-                          ? 'bg-red-600 text-white' 
-                          : anime.subDubStatus === 'Hindi Sub'
-                          ? 'bg-orange-600 text-white'
-                          : anime.subDubStatus === 'English Sub'
-                          ? 'bg-blue-600 text-white'
+                    </td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        anime.contentType === 'Movie' 
+                          ? 'bg-blue-600 text-white' 
+                          : anime.contentType === 'Manga'
+                          ? 'bg-green-600 text-white'
                           : 'bg-purple-600 text-white'
-                      }`}
-                      style={{ minWidth: '80px', display: 'inline-block', textAlign: 'center' }}
-                    >
-                      {anime.subDubStatus}
-                    </span>
-                  </td>
-                  <td className="p-4 text-slate-300">
-                    <span className="bg-blue-600/20 text-blue-400 px-2 py-1 rounded text-xs whitespace-nowrap">
-                      {anime.episodes?.length || 0} episodes
-                    </span>
-                  </td>
-                  <td className="p-4 text-slate-300">
-                    {anime.reportCount ? (
-                      <span className="bg-red-600/20 text-red-400 px-2 py-1 rounded text-xs whitespace-nowrap">
-                        {anime.reportCount} reports
+                      }`}>
+                        {anime.contentType}
                       </span>
-                    ) : (
-                      <span className="text-slate-500 text-xs whitespace-nowrap">No reports</span>
-                    )}
-                  </td>
-                  <td className="p-4">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => handleEdit(anime)}
-                        className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-sm transition-colors whitespace-nowrap"
+                    </td>
+                    <td className="p-4 text-slate-300">{anime.releaseYear}</td>
+                    <td className="p-4">
+                      <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                        anime.status === 'Complete' 
+                          ? 'bg-green-600 text-white' 
+                          : 'bg-yellow-600 text-white'
+                      }`}>
+                        {anime.status || 'Ongoing'}
+                      </span>
+                    </td>
+                    <td className="p-4">
+                      <span 
+                        className={`px-2 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${
+                          anime.subDubStatus === 'Hindi Dub' 
+                            ? 'bg-red-600 text-white' 
+                            : anime.subDubStatus === 'Hindi Sub'
+                            ? 'bg-orange-600 text-white'
+                            : anime.subDubStatus === 'English Sub'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-purple-600 text-white'
+                        }`}
+                        style={{ minWidth: '80px', display: 'inline-block', textAlign: 'center' }}
                       >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(anime.id)}
-                        className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded text-sm transition-colors whitespace-nowrap"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                        {anime.subDubStatus}
+                      </span>
+                    </td>
+                    <td className="p-4 text-slate-300">
+                      <span className="bg-blue-600/20 text-blue-400 px-2 py-1 rounded text-xs whitespace-nowrap">
+                        {anime.episodes?.length || 0} episodes
+                      </span>
+                    </td>
+                    <td className="p-4 text-slate-300">
+                      {anime.reportCount ? (
+                        <span className="bg-red-600/20 text-red-400 px-2 py-1 rounded text-xs whitespace-nowrap">
+                          {anime.reportCount} reports
+                        </span>
+                      ) : (
+                        <span className="text-slate-500 text-xs whitespace-nowrap">No reports</span>
+                      )}
+                    </td>
+                    <td className="p-4">
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleEdit(anime)}
+                          className="bg-blue-600 hover:bg-blue-500 text-white px-3 py-1 rounded text-sm transition-colors whitespace-nowrap"
+                        >
+                          {editingAnimeId === anime.id ? 'Editing...' : 'Edit'}
+                        </button>
+                        <button
+                          onClick={() => handleDelete(anime.id)}
+                          className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded text-sm transition-colors whitespace-nowrap"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  
+                  {/* INLINE EDIT FORM */}
+                  {editingAnimeId === anime.id && (
+                    <tr className="bg-slate-900/80">
+                      <td colSpan={8} className="p-6">
+                        <div className="border-l-4 border-blue-500 pl-4">
+                          <div className="flex justify-between items-center mb-4">
+                            <h3 className="text-lg font-semibold text-white">
+                              Edit {editForm.contentType}: {editForm.title}
+                            </h3>
+                            <button
+                              onClick={cancelEdit}
+                              className="text-slate-400 hover:text-white text-xl"
+                            >
+                              &times;
+                            </button>
+                          </div>
+
+                          <form onSubmit={handleEditSubmit} className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Title *</label>
+                                <input
+                                  type="text"
+                                  value={editForm.title}
+                                  onChange={(e) => setEditForm({ ...editForm, title: e.target.value })}
+                                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                  required
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Content Type</label>
+                                <select
+                                  value={editForm.contentType}
+                                  onChange={(e) => setEditForm({ ...editForm, contentType: e.target.value as 'Anime' | 'Movie' | 'Manga' })}
+                                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                >
+                                  <option value="Anime">Anime Series</option>
+                                  <option value="Movie">Movie</option>
+                                  <option value="Manga">Manga</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Release Year</label>
+                                <input
+                                  type="number"
+                                  value={editForm.releaseYear}
+                                  onChange={(e) => setEditForm({ ...editForm, releaseYear: Number(e.target.value) })}
+                                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                  min="1900"
+                                  max="2030"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Status</label>
+                                <select
+                                  value={editForm.status}
+                                  onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}
+                                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                >
+                                  <option value="Ongoing">Ongoing</option>
+                                  <option value="Complete">Complete</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Sub/Dub Status</label>
+                                <select
+                                  value={editForm.subDubStatus}
+                                  onChange={(e) => setEditForm({ ...editForm, subDubStatus: e.target.value as Anime['subDubStatus'] })}
+                                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                >
+                                  <option value="Hindi Dub">Hindi Dub</option>
+                                  <option value="Hindi Sub">Hindi Sub</option>
+                                  <option value="English Sub">English Sub</option>
+                                  <option value="Both">Both</option>
+                                  <option value="Subbed">Subbed</option>
+                                  <option value="Dubbed">Dubbed</option>
+                                  <option value="Sub & Dub">Sub & Dub</option>
+                                  <option value="Dual Audio">Dual Audio</option>
+                                </select>
+                              </div>
+
+                              <div>
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Thumbnail URL</label>
+                                <input
+                                  type="url"
+                                  value={editForm.thumbnail}
+                                  onChange={(e) => setEditForm({ ...editForm, thumbnail: e.target.value })}
+                                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                />
+                              </div>
+
+                              <div className="md:col-span-2">
+                                <label className="block text-sm font-medium text-slate-300 mb-2">Genres (comma separated)</label>
+                                <input
+                                  type="text"
+                                  value={editForm.genreList.join(', ')}
+                                  onChange={handleGenreChange}
+                                  className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                  placeholder="Action, Adventure, Fantasy"
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <label className="block text-sm font-medium text-slate-300 mb-2">Description</label>
+                              <textarea
+                                value={editForm.description}
+                                onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                                className="w-full bg-slate-800 border border-slate-600 text-white rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors h-20"
+                              />
+                            </div>
+
+                            <div className="flex gap-3 pt-2">
+                              <button
+                                type="submit"
+                                className="bg-green-600 hover:bg-green-500 text-white font-semibold py-2 px-6 rounded-lg transition-colors text-sm"
+                              >
+                                Save Changes
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEdit}
+                                className="bg-slate-600 hover:bg-slate-500 text-white font-semibold py-2 px-6 rounded-lg transition-colors text-sm"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </form>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
