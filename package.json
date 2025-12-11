@@ -9,9 +9,7 @@
     "preview": "vite preview",
     "server": "node server.cjs",
     "dev:full": "concurrently \"npm run server\" \"npm run dev\"",
-    "start": "node server.cjs",
-    "build:full": "npm run build && npm run server",
-    "reset-chapters": "node -e \"require('./models/Chapter.cjs'); require('./routes/chapterRoutes.cjs').delete('/all').then(() => console.log('Chapters reset'))\""
+    "start": "node server.cjs"
   },
   "dependencies": {
     "@types/react-router-dom": "^5.3.3",
@@ -31,12 +29,13 @@
     "swiper": "^12.0.3",
     "ua-parser-js": "^2.0.6",
     "vite-plugin-pwa": "^1.1.0",
-    "vite": "^6.2.0"
+
+    "vite": "^6.2.0",        
+    "@vitejs/plugin-react": "^5.0.0", 
+    "concurrently": "^8.2.2"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "concurrently": "^8.2.2",
     "typescript": "~5.8.2"
   }
 }
