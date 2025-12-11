@@ -22,7 +22,7 @@ interface Props {
   isLoading?: boolean;
 }
 
-const API_BASE = 'https://animabing.onrender.com/api';
+const API_BASE = 'https://animabingwatch.onrender.com/api';
 
 const AnimeDetailPage: React.FC<Props> = ({ anime, onBack, isLoading = false }) => {
   const navigate = useNavigate();
