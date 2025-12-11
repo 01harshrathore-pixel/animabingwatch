@@ -1,4 +1,4 @@
- // server.cjs - COMPLETE FIXED VERSION WITH CORS FOR DEPLOYMENT
+  // server.cjs - COMPLETE FIXED VERSION WITH ACTIVE AD SLOTS ROUTE
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./db.cjs');
@@ -21,24 +21,7 @@ const contactRoutes = require('./routes/contactRoutes.cjs');
 
 const app = express();
 
-// ✅ UPDATED CORS SETTINGS FOR DEPLOYMENT
-const corsOptions = {
-  origin: [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'https://animabingwatch.pages.dev',
-    'https://animabingwatch.onrender.com',
-    'https://animabingwatch-backend.onrender.com',
-    'https://animabingwatch.vercel.app',
-    'https://*.pages.dev',
-    'https://*.onrender.com',
-    'https://*.vercel.app'
-  ],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
-};
-app.use(cors(corsOptions));
+app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
 
@@ -676,7 +659,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`🔧 Admin: ${process.env.ADMIN_USER} / ${process.env.ADMIN_PASS}`);
-  console.log(`🌐 Frontend: https://animabingwatch.pages.dev`);
+  console.log(`🌐 Frontend: https:// animabingwatch.page.dev`);
   console.log(`🔗 API: https://animabingwatch.onrender.com/api`);
   console.log(`📢 Active Ad Slots: https://animabingwatch.onrender.com/api/ad-slots/active`);
   console.log(`🆕 Emergency Route: https://animabingwatch.onrender.com/api/emergency/set-all-featured`);
