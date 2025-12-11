@@ -1,10 +1,131 @@
- // routes/animeRoutes.cjs - COMPLETE VERSION WITH ALL FEATURED ROUTES
-const express = require('express');
+  const express = require('express');
 const router = express.Router();
 const Anime = require('../models/Anime.cjs');
+const adminAuth = require('../middleware/adminAuth.cjs'); // ✅ Add this
 
 /**
- * ✅ ADDED: FEATURED ANIME ROUTE (FIXES THE ERROR)
+ * ✅ NEW: ADMIN ROUTE - GET ALL ANIME FOR ADMIN DASHBOARD
+ * This route requires admin authentication
+ */
+router.get('/admin/list', adminAuth, async (req, res) => {
+  try {
+    console.log('📊 Admin fetching anime list...');
+    
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const skip = (page - 1) * limit;
+    
+    const search = req.query.search || '';
+    const contentType = req.query.contentType || '';
+    const status = req.query.status || '';
+    
+    // Build search query
+    const query = {};
+    
+    if (search) {
+      query.title = { $regex: search, $options: 'i' };
+    }
+    
+    if (contentType && contentType !== 'All') {
+      query.contentType = contentType;
+    }
+    
+    if (status && status !== 'All') {
+      query.status = status;
+    }
+    
+    // Get anime with all fields (admin needs all data)
+    const anime = await Anime.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit)
+      .lean();
+    
+    const total = await Anime.countDocuments(query);
+    
+    // Format response for admin
+    const formattedAnime = anime.map(item => ({
+      _id: item._id,
+      id: item._id,
+      title: item.title,
+      thumbnail: item.thumbnail,
+      bannerImage: item.bannerImage || '',
+      contentType: item.contentType || 'Anime',
+      status: item.status || 'Ongoing',
+      subDubStatus: item.subDubStatus || 'Hindi Sub',
+      releaseYear: item.releaseYear || new Date().getFullYear(),
+      rating: item.rating || 0,
+      description: item.description || '',
+      genreList: item.genreList || [],
+      episodes: item.episodes || [],
+      reportCount: item.reportCount || 0,
+      featured: item.featured || false,
+      views: item.views || 0,
+      createdAt: item.createdAt,
+      updatedAt: item.updatedAt,
+      isActive: item.isActive !== false // Default to true if not set
+    }));
+    
+    res.json(formattedAnime); // ✅ Return array directly (as expected in AnimeListTable)
+    
+  } catch (err) {
+    console.error('❌ Admin anime list error:', err);
+    res.status(500).json({ error: 'Failed to load anime list for admin' });
+  }
+});
+
+/**
+ * ✅ NEW: ADMIN ROUTE - UPDATE ANIME STATUS
+ */
+router.put('/admin/status/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { isActive } = req.body;
+    
+    const updatedAnime = await Anime.findByIdAndUpdate(
+      id,
+      { isActive },
+      { new: true }
+    );
+    
+    if (!updatedAnime) {
+      return res.status(404).json({ error: 'Anime not found' });
+    }
+    
+    res.json({ success: true, message: 'Status updated' });
+  } catch (err) {
+    console.error('❌ Status update error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * ✅ NEW: ADMIN ROUTE - DELETE ANIME
+ */
+router.delete('/admin/:id', adminAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const deletedAnime = await Anime.findByIdAndDelete(id);
+    
+    if (!deletedAnime) {
+      return res.status(404).json({ error: 'Anime not found' });
+    }
+    
+    res.json({ success: true, message: 'Anime deleted successfully' });
+  } catch (err) {
+    console.error('❌ Delete error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ✅ EXISTING CODE CONTINUES BELOW...
+// =========================================
+// DON'T MODIFY BELOW THIS LINE
+// =========================================
+
+/**
+ * ✅ FIXED: FEATURED ANIME ROUTE (FIXES THE ERROR)
  * This must be added BEFORE the /:id route
  */
 router.get('/featured', async (req, res) => {
@@ -14,14 +135,9 @@ router.get('/featured', async (req, res) => {
       featured: true 
     })
     .select('title thumbnail releaseYear subDubStatus contentType updatedAt createdAt bannerImage rating')
-    .sort({ featuredOrder: -1, createdAt: -1 }) // ✅ Added featuredOrder for manual ordering
+    .sort({ featuredOrder: -1, createdAt: -1 })
     .limit(10)
     .lean();
-
-    // ✅ Set cache headers for featured content
-    res.set({
-      'Cache-Control': 'public, max-age=600', // 10 minutes cache for featured
-    });
 
     res.json({ 
       success: true, 
@@ -34,7 +150,7 @@ router.get('/featured', async (req, res) => {
 });
 
 /**
- * ✅ OPTIMIZED: GET anime with PAGINATION
+ * ✅ FIXED: GET anime with PAGINATION
  * Returns paginated anime from DB sorted by LATEST UPDATE
  */
 router.get('/', async (req, res) => {
@@ -43,23 +159,15 @@ router.get('/', async (req, res) => {
     const limit = parseInt(req.query.limit) || 24;
     const skip = (page - 1) * limit;
 
-    // ✅ OPTIMIZED: Only get necessary fields for listing
+    // ✅ FIXED: Only get necessary fields for listing
     const anime = await Anime.find()
       .select('title thumbnail releaseYear subDubStatus contentType updatedAt createdAt')
       .sort({ updatedAt: -1 })
       .skip(skip)
       .limit(limit)
-      .lean(); // Faster response
+      .lean();
 
     const total = await Anime.countDocuments();
-
-    // ✅ OPTIMIZED: Set cache headers
-    res.set({
-      'Cache-Control': 'public, max-age=300', // 5 minutes cache
-      'X-Total-Count': total,
-      'X-Page': page,
-      'X-Limit': limit
-    });
 
     res.json({ 
       success: true, 
@@ -78,7 +186,7 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * ✅ OPTIMIZED: SEARCH anime with PAGINATION
+ * ✅ FIXED: SEARCH anime with PAGINATION
  */
 router.get('/search', async (req, res) => {
   try {
@@ -100,11 +208,6 @@ router.get('/search', async (req, res) => {
       title: { $regex: q, $options: 'i' }
     });
 
-    res.set({
-      'Cache-Control': 'public, max-age=300',
-      'X-Total-Count': total
-    });
-
     res.json({ 
       success: true, 
       data: found,
@@ -122,11 +225,11 @@ router.get('/search', async (req, res) => {
 });
 
 /**
- * ✅ GET single anime by ID
+ * ✅ FIXED: GET single anime by ID
  */
 router.get('/:id', async (req, res) => {
   try {
-    const item = await Anime.findById(req.params.id).populate('episodes');
+    const item = await Anime.findById(req.params.id);
     if (!item) return res.status(404).json({ success: false, message: 'Anime not found' });
     res.json({ success: true, data: item });
   } catch (err) {
