@@ -1,13 +1,117 @@
- // routes/adminRoutes.cjs - COMPLETE FIXED VERSION WITH ALL AD ROUTES
+ // routes/adminRoutes.cjs - COMPLETE FIXED VERSION
 const express = require('express');
 const router = express.Router();
+const jwt = require('jsonwebtoken');
 const Anime = require('../models/Anime.cjs');
-const Episode = require('../models/Episode.cjs'); // ✅ Changed to Episod.cjs
+const Episode = require('../models/Episode.cjs');
 const Chapter = require('../models/Chapter.cjs');
 const Report = require('../models/Report.cjs');
 const SocialMedia = require('../models/SocialMedia.cjs');
 const AdSlot = require('../models/AdSlot.cjs');
 const Analytics = require('../models/Analytics.cjs');
+
+// ✅ AUTHENTICATION MIDDLEWARE - REMOVED DUPLICATE
+// Note: Middleware is already applied in server.cjs at /api/admin/protected route
+// So we don't need to apply it again here
+
+// ✅ GET user info
+router.get('/user-info', async (req, res) => {
+  try {
+    console.log('🔍 Fetching user info for admin ID:', req.admin.id);
+    
+    const Admin = require('../models/Admin.cjs');
+    const admin = await Admin.findById(req.admin.id).select('username email');
+    
+    if (!admin) {
+      console.error('❌ Admin not found for ID:', req.admin.id);
+      return res.status(404).json({ 
+        success: false,
+        error: 'Admin not found' 
+      });
+    }
+    
+    console.log('✅ Admin found:', admin.username);
+    
+    res.json({
+      success: true,
+      username: admin.username,
+      email: admin.email || 'admin@animabingwatch.com'
+    });
+  } catch (err) {
+    console.error('❌ Error in user-info route:', err.message);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+});
+
+// ✅ GET analytics
+router.get('/analytics', async (req, res) => {
+  try {
+    console.log('📊 Admin analytics requested by:', req.admin.username);
+    
+    const totalAnimes = await Anime.countDocuments({ contentType: 'Anime' });
+    const totalMovies = await Anime.countDocuments({ contentType: 'Movie' });
+    const totalManga = await Anime.countDocuments({ contentType: 'Manga' });
+    const totalEpisodes = await Episode.countDocuments();
+    const totalChapters = await Chapter.countDocuments();
+    const totalReports = await Report.countDocuments();
+    const pendingReports = await Report.countDocuments({ status: 'Pending' });
+
+    // Get today's stats
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const todayStats = await Analytics.findOne({ 
+      date: { 
+        $gte: today,
+        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
+      }
+    });
+
+    // Calculate totals from Analytics
+    const allTimeStats = await Analytics.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalUsers: { $sum: '$uniqueVisitors' },
+          totalPageViews: { $sum: '$pageViews' },
+          totalEarnings: { $sum: '$earnings' }
+        }
+      }
+    ]);
+
+    const totals = allTimeStats.length > 0 ? allTimeStats[0] : {
+      totalUsers: 0,
+      totalPageViews: 0,
+      totalEarnings: 0
+    };
+
+    res.json({
+      success: true,
+      totalAnimes,
+      totalMovies,
+      totalManga,
+      totalEpisodes,
+      totalChapters,
+      totalReports,
+      pendingReports,
+      todayUsers: todayStats ? todayStats.uniqueVisitors : 0,
+      totalUsers: totals.totalUsers || 0,
+      todayEarnings: todayStats ? todayStats.earnings : 0,
+      totalEarnings: totals.totalEarnings || 0,
+      todayPageViews: todayStats ? todayStats.pageViews : 0,
+      totalPageViews: totals.totalPageViews || 0
+    });
+  } catch (err) {
+    console.error('Analytics error:', err);
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
+  }
+});
 
 // ✅ GET filtered anime list with content type
 router.get('/anime-list', async (req, res) => {
@@ -18,9 +122,15 @@ router.get('/anime-list', async (req, res) => {
     if (contentType && contentType !== 'All') query.contentType = contentType;
     
     const animes = await Anime.find(query).populate('episodes').sort({ createdAt: -1 });
-    res.json(animes);
+    res.json({
+      success: true,
+      data: animes
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -30,7 +140,10 @@ router.post('/add-anime', async (req, res) => {
     const { title, description, thumbnail, status, subDubStatus, genreList, releaseYear, contentType } = req.body;
     
     const existing = await Anime.findOne({ title });
-    if (existing) return res.status(400).json({ error: 'Anime/Movie already exists' });
+    if (existing) return res.status(400).json({ 
+      success: false,
+      error: 'Anime/Movie already exists' 
+    });
 
     const anime = new Anime({ 
       title, 
@@ -44,10 +157,17 @@ router.post('/add-anime', async (req, res) => {
     });
     
     await anime.save();
-    res.json({ success: true, message: `${contentType || 'Anime'} added!`, anime });
+    res.json({ 
+      success: true, 
+      message: `${contentType || 'Anime'} added!`, 
+      data: anime 
+    });
   } catch (err) {
     console.error('Add anime error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -63,11 +183,21 @@ router.put('/edit-anime/:id', async (req, res) => {
       { new: true, runValidators: true }
     );
     
-    if (!anime) return res.status(404).json({ error: 'Anime/Movie not found' });
+    if (!anime) return res.status(404).json({ 
+      success: false,
+      error: 'Anime/Movie not found' 
+    });
     
-    res.json({ success: true, message: 'Updated successfully!', anime });
+    res.json({ 
+      success: true, 
+      message: 'Updated successfully!', 
+      data: anime 
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -79,15 +209,21 @@ router.delete('/delete-anime', async (req, res) => {
     // Also delete associated episodes and reports
     await Episode.deleteMany({ animeId: id });
     await Report.deleteMany({ animeId: id });
-    res.json({ success: true, message: 'Deleted successfully!' });
+    res.json({ 
+      success: true, 
+      message: 'Deleted successfully!' 
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
-// ✅ EPISODE MANAGEMENT ROUTES (UPDATED FOR MULTIPLE DOWNLOAD LINKS)
+// ✅ EPISODE MANAGEMENT ROUTES
 
-// Edit episode (UPDATED FOR MULTIPLE DOWNLOAD LINKS)
+// Edit episode
 router.put('/edit-episode/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -102,11 +238,17 @@ router.put('/edit-episode/:id', async (req, res) => {
     // ✅ Validate downloadLinks if provided
     if (downloadLinks !== undefined) {
       if (!Array.isArray(downloadLinks) || downloadLinks.length === 0) {
-        return res.status(400).json({ error: 'At least one download link is required' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'At least one download link is required' 
+        });
       }
 
       if (downloadLinks.length > 5) {
-        return res.status(400).json({ error: 'Maximum 5 download links allowed' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'Maximum 5 download links allowed' 
+        });
       }
 
       // Validate each download link
@@ -114,6 +256,7 @@ router.put('/edit-episode/:id', async (req, res) => {
         const link = downloadLinks[i];
         if (!link.name || !link.url) {
           return res.status(400).json({ 
+            success: false,
             error: `Download link ${i + 1} must have both name and url` 
           });
         }
@@ -141,7 +284,10 @@ router.put('/edit-episode/:id', async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!episode) return res.status(404).json({ error: 'Episode not found' });
+    if (!episode) return res.status(404).json({ 
+      success: false,
+      error: 'Episode not found' 
+    });
 
     // ✅ Update anime's lastContentAdded for homepage priority
     await Anime.updateLastContent(episode.animeId);
@@ -149,14 +295,20 @@ router.put('/edit-episode/:id', async (req, res) => {
     res.json({ 
       success: true, 
       message: 'Episode updated successfully!', 
-      episode 
+      data: episode 
     });
   } catch (err) {
     console.error('Edit episode error:', err);
     if (err.name === 'ValidationError') {
-      return res.status(400).json({ error: err.message });
+      return res.status(400).json({ 
+        success: false,
+        error: err.message 
+      });
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -175,11 +327,17 @@ router.put('/edit-chapter/:id', async (req, res) => {
     // ✅ Validate downloadLinks if provided
     if (downloadLinks !== undefined) {
       if (!Array.isArray(downloadLinks) || downloadLinks.length === 0) {
-        return res.status(400).json({ error: 'At least one download link is required' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'At least one download link is required' 
+        });
       }
 
       if (downloadLinks.length > 5) {
-        return res.status(400).json({ error: 'Maximum 5 download links allowed' });
+        return res.status(400).json({ 
+          success: false,
+          error: 'Maximum 5 download links allowed' 
+        });
       }
 
       // Validate each download link
@@ -187,6 +345,7 @@ router.put('/edit-chapter/:id', async (req, res) => {
         const link = downloadLinks[i];
         if (!link.name || !link.url) {
           return res.status(400).json({ 
+            success: false,
             error: `Download link ${i + 1} must have both name and url` 
           });
         }
@@ -214,7 +373,10 @@ router.put('/edit-chapter/:id', async (req, res) => {
       { new: true, runValidators: true }
     );
 
-    if (!chapter) return res.status(404).json({ error: 'Chapter not found' });
+    if (!chapter) return res.status(404).json({ 
+      success: false,
+      error: 'Chapter not found' 
+    });
 
     // ✅ Update manga's lastContentAdded for homepage priority
     await Anime.updateLastContent(chapter.mangaId);
@@ -222,14 +384,20 @@ router.put('/edit-chapter/:id', async (req, res) => {
     res.json({ 
       success: true, 
       message: 'Chapter updated successfully!', 
-      chapter 
+      data: chapter 
     });
   } catch (err) {
     console.error('Edit chapter error:', err);
     if (err.name === 'ValidationError') {
-      return res.status(400).json({ error: err.message });
+      return res.status(400).json({ 
+        success: false,
+        error: err.message 
+      });
     }
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -247,14 +415,20 @@ router.get('/reports', async (req, res) => {
     
     console.log(`✅ Found ${reports.length} reports for admin`);
     
-    res.json(reports);
+    res.json({
+      success: true,
+      data: reports
+    });
   } catch (err) {
     console.error('❌ Admin reports error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
-// Update report status with response - FIXED VERSION
+// Update report status with response
 router.put('/reports/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -283,11 +457,14 @@ router.put('/reports/:id', async (req, res) => {
     res.json({ 
       success: true, 
       message: 'Report updated successfully!', 
-      report 
+      data: report 
     });
   } catch (err) {
     console.error('Report update error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -299,7 +476,10 @@ router.delete('/reports/:id', async (req, res) => {
 
     const report = await Report.findById(id);
     if (!report) {
-      return res.status(404).json({ error: 'Report not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Report not found' 
+      });
     }
 
     await Report.findByIdAndDelete(id);
@@ -311,7 +491,10 @@ router.delete('/reports/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('❌ Delete report error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -325,7 +508,10 @@ router.post('/reports/bulk-delete', async (req, res) => {
       message: `${reportIds.length} reports deleted successfully!` 
     });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -335,9 +521,15 @@ router.post('/reports/bulk-delete', async (req, res) => {
 router.get('/social-media', async (req, res) => {
   try {
     const socialLinks = await SocialMedia.find();
-    res.json(socialLinks);
+    res.json({
+      success: true,
+      data: socialLinks
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -353,9 +545,15 @@ router.put('/social-media/:platform', async (req, res) => {
       { new: true, upsert: true }
     );
     
-    res.json(socialLink);
+    res.json({
+      success: true,
+      data: socialLink
+    });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
@@ -375,11 +573,17 @@ router.get('/ad-slots', async (req, res) => {
       console.log('🆕 No ad slots found, creating default slots...');
       await AdSlot.initDefaultSlots();
       const newAdSlots = await AdSlot.find().sort({ position: 1 });
-      return res.json(newAdSlots);
+      return res.json({
+        success: true,
+        data: newAdSlots
+      });
     }
     
     console.log(`✅ Found ${adSlots.length} ad slots`);
-    res.json(adSlots);
+    res.json({
+      success: true,
+      data: adSlots
+    });
   } catch (error) {
     console.error('❌ Error fetching ad slots:', error);
     res.status(500).json({ 
@@ -424,7 +628,7 @@ router.put('/ad-slots/:id', async (req, res) => {
     res.json({
       success: true,
       message: 'Ad slot updated successfully!',
-      adSlot
+      data: adSlot
     });
   } catch (error) {
     console.error('❌ Error updating ad slot:', error);
@@ -468,7 +672,7 @@ router.post('/track-ad-click', async (req, res) => {
     res.json({
       success: true,
       message: 'Ad click tracked successfully!',
-      adSlot,
+      data: adSlot,
       earningsAdded: earnings
     });
   } catch (error) {
@@ -501,34 +705,36 @@ router.get('/ad-analytics', async (req, res) => {
     
     res.json({
       success: true,
-      adPerformance: {
-        totalImpressions,
-        totalClicks,
-        totalRevenue: totalEarnings,
-        ctr: parseFloat(ctr),
-        activeAds
-      },
-      adSlots: adSlots.map(slot => ({
-        id: slot._id,
-        name: slot.name,
-        position: slot.position,
-        isActive: slot.isActive,
-        earnings: slot.earnings || 0,
-        clicks: slot.clicks || 0,
-        impressions: slot.impressions || 0,
-        ctr: slot.impressions > 0 ? ((slot.clicks / slot.impressions) * 100).toFixed(2) : 0
-      })),
-      topPerformingSlots: adSlots
-        .filter(slot => slot.earnings > 0)
-        .sort((a, b) => (b.earnings || 0) - (a.earnings || 0))
-        .slice(0, 3)
-        .map(slot => ({
+      data: {
+        adPerformance: {
+          totalImpressions,
+          totalClicks,
+          totalRevenue: totalEarnings,
+          ctr: parseFloat(ctr),
+          activeAds
+        },
+        adSlots: adSlots.map(slot => ({
+          id: slot._id,
           name: slot.name,
           position: slot.position,
+          isActive: slot.isActive,
           earnings: slot.earnings || 0,
           clicks: slot.clicks || 0,
+          impressions: slot.impressions || 0,
           ctr: slot.impressions > 0 ? ((slot.clicks / slot.impressions) * 100).toFixed(2) : 0
-        }))
+        })),
+        topPerformingSlots: adSlots
+          .filter(slot => slot.earnings > 0)
+          .sort((a, b) => (b.earnings || 0) - (a.earnings || 0))
+          .slice(0, 3)
+          .map(slot => ({
+            name: slot.name,
+            position: slot.position,
+            earnings: slot.earnings || 0,
+            clicks: slot.clicks || 0,
+            ctr: slot.impressions > 0 ? ((slot.clicks / slot.impressions) * 100).toFixed(2) : 0
+          }))
+      }
     });
     
   } catch (error) {
@@ -572,107 +778,7 @@ router.post('/increment-impression/:slotId', async (req, res) => {
   }
 });
 
-// ✅ EXISTING ANALYTICS ROUTE (keep as is)
-router.get('/analytics', async (req, res) => {
-  try {
-    const totalAnimes = await Anime.countDocuments({ contentType: 'Anime' });
-    const totalMovies = await Anime.countDocuments({ contentType: 'Movie' });
-    const totalManga = await Anime.countDocuments({ contentType: 'Manga' });
-    const totalEpisodes = await Episode.countDocuments();
-    const totalChapters = await Chapter.countDocuments();
-    const totalReports = await Report.countDocuments();
-    const pendingReports = await Report.countDocuments({ status: 'Pending' });
-
-    // Get today's date
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
-    const todayStats = await Analytics.findOne({ 
-      date: { 
-        $gte: today,
-        $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000)
-      }
-    });
-
-    // Aggregation for all-time stats
-    let allTimeStats;
-    try {
-      allTimeStats = await Analytics.aggregate([
-        {
-          $group: {
-            _id: null,
-            totalUsers: { $sum: '$uniqueVisitors' },
-            totalPageViews: { $sum: '$pageViews' },
-            totalEarnings: { $sum: '$earnings' }
-          }
-        }
-      ]);
-    } catch (aggError) {
-      console.log('Using fallback for analytics aggregation');
-      allTimeStats = [];
-    }
-
-    const totals = allTimeStats.length > 0 ? allTimeStats[0] : {
-      totalUsers: 0,
-      totalPageViews: 0,
-      totalEarnings: 0
-    };
-
-    // Get ad performance data
-    const adSlots = await AdSlot.find();
-    const totalAdImpressions = adSlots.reduce((sum, slot) => sum + (slot.impressions || 0), 0);
-    const totalAdClicks = adSlots.reduce((sum, slot) => sum + (slot.clicks || 0), 0);
-    const totalAdRevenue = adSlots.reduce((sum, slot) => sum + (slot.earnings || 0), 0);
-    const adCtr = totalAdImpressions > 0 ? (totalAdClicks / totalAdImpressions * 100).toFixed(2) : 0;
-
-    res.json({
-      totalAnimes,
-      totalMovies,
-      totalManga,
-      totalEpisodes,
-      totalChapters,
-      totalReports,
-      pendingReports,
-      todayUsers: todayStats ? todayStats.uniqueVisitors : 0,
-      totalUsers: totals.totalUsers || 0,
-      todayEarnings: todayStats ? todayStats.earnings : 0,
-      totalEarnings: totals.totalEarnings || 0,
-      todayPageViews: todayStats ? todayStats.pageViews : 0,
-      totalPageViews: totals.totalPageViews || 0,
-      adPerformance: {
-        totalImpressions: totalAdImpressions,
-        totalClicks: totalAdClicks,
-        totalRevenue: totalAdRevenue,
-        ctr: parseFloat(adCtr)
-      },
-      weeklyStats: [],
-      deviceStats: { desktop: 60, mobile: 35, tablet: 5 },
-      browserStats: { Chrome: 70, Firefox: 15, Safari: 10, Edge: 4, Unknown: 1 }
-    });
-  } catch (err) {
-    console.error('Analytics error:', err);
-    res.status(500).json({ 
-      success: false,
-      error: err.message 
-    });
-  }
-});
-
-// ✅ GET user info
-router.get('/user-info', async (req, res) => {
-  try {
-    const Admin = require('../models/Admin.cjs');
-    const admin = await Admin.findById(req.admin.id);
-    res.json({
-      username: admin.username,
-      email: admin.email
-    });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-
-// ✅ NEW ROUTE: Get episode details for editing (including download links)
+// ✅ NEW ROUTE: Get episode details for editing
 router.get('/episode/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -680,12 +786,15 @@ router.get('/episode/:id', async (req, res) => {
     const episode = await Episode.findById(id);
     
     if (!episode) {
-      return res.status(404).json({ error: 'Episode not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Episode not found' 
+      });
     }
     
     res.json({
       success: true,
-      episode: {
+      data: {
         _id: episode._id,
         animeId: episode.animeId,
         title: episode.title,
@@ -697,11 +806,14 @@ router.get('/episode/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('Get episode error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
-// ✅ NEW ROUTE: Get chapter details for editing (including download links)
+// ✅ NEW ROUTE: Get chapter details for editing
 router.get('/chapter/:id', async (req, res) => {
   try {
     const { id } = req.params;
@@ -709,12 +821,15 @@ router.get('/chapter/:id', async (req, res) => {
     const chapter = await Chapter.findById(id);
     
     if (!chapter) {
-      return res.status(404).json({ error: 'Chapter not found' });
+      return res.status(404).json({ 
+        success: false,
+        error: 'Chapter not found' 
+      });
     }
     
     res.json({
       success: true,
-      chapter: {
+      data: {
         _id: chapter._id,
         mangaId: chapter.mangaId,
         title: chapter.title,
@@ -726,7 +841,10 @@ router.get('/chapter/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('Get chapter error:', err);
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ 
+      success: false,
+      error: err.message 
+    });
   }
 });
 
