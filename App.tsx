@@ -1,12 +1,4 @@
    // App.tsx - UPDATED WITH BOTH DOWNLOAD ROUTES
-// ⭐⭐⭐ SABSE PEHLE YE 4 LINES ADD KAREIN ⭐⭐⭐
-if (import.meta.env.PROD) {
-  // Saare console methods completely disable karein
-  console.log = console.info = console.debug = console.warn = 
-  console.error = console.trace = console.table = console.dir = 
-  console.group = console.groupEnd = console.groupCollapsed = 
-  console.time = console.timeEnd = () => {};
-}
 
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation, useParams, useSearchParams } from 'react-router-dom';
