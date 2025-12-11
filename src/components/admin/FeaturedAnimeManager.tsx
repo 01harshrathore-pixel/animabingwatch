@@ -27,8 +27,8 @@ const FeaturedAnimeManager: React.FC<FeaturedAnimeManagerProps> = () => {
       const endpoints = [
         '/api/anime',
         '/api/animes', 
-        'https://animabing.onrender.com/api/anime',
-        'https://animabing.onrender.com/api/animes'
+        'https://animabingwatch.onrender.com/api/anime',
+        'https://animabingwatch.onrender.com/api/animes'
       ];
 
       let success = false;
@@ -191,7 +191,7 @@ const FeaturedAnimeManager: React.FC<FeaturedAnimeManagerProps> = () => {
       const endpoints = [
         '/api/anime/featured',
         '/api/featured',
-        'https://animabing.onrender.com/api/anime/featured'
+        'https://animabingwatch.onrender.com/api/anime/featured'
       ];
 
       let success = false;
@@ -282,7 +282,7 @@ const FeaturedAnimeManager: React.FC<FeaturedAnimeManagerProps> = () => {
       
       // ✅ FIXED: Use correct API endpoint with absolute URL
       try {
-        const response = await fetch(`https://animabing.onrender.com/api/anime/${animeId}/featured`, {
+        const response = await fetch(`https://animabingwatch.onrender.com/api/anime/${animeId}/featured`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -320,7 +320,7 @@ const FeaturedAnimeManager: React.FC<FeaturedAnimeManagerProps> = () => {
       
       // ✅ FIXED: Use correct API endpoint with absolute URL
       try {
-        const response = await fetch(`https://animabing.onrender.com/api/anime/${animeId}/featured`, {
+        const response = await fetch(`https://animabingwatch.onrender.com/api/anime/${animeId}/featured`, {
           method: 'DELETE',
         });
 
@@ -355,7 +355,7 @@ const FeaturedAnimeManager: React.FC<FeaturedAnimeManagerProps> = () => {
     
     // ✅ FIXED: Use correct API endpoint
     try {
-      fetch('https://animabing.onrender.com/api/anime/featured/order', {
+      fetch('https://animabingwatch.onrender.com/api/anime/featured/order', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
