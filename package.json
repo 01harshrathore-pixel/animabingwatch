@@ -1,4 +1,4 @@
- {
+  {
   "name": "animabingwatch",
   "private": true,
   "version": "1.0.0",
@@ -30,13 +30,13 @@
     "react-router-dom": "^7.9.5",
     "swiper": "^12.0.3",
     "ua-parser-js": "^2.0.6",
-    "vite-plugin-pwa": "^1.1.0"
+    "vite-plugin-pwa": "^1.1.0",
+    "vite": "^6.2.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "concurrently": "^8.2.2",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
+    "typescript": "~5.8.2"
   }
 }
