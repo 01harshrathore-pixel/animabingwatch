@@ -1,12 +1,12 @@
-// middleware/adminAuth.cjs - SECURE VERSION
+ // middleware/adminAuth.cjs - SECURE VERSION
 const jwt = require('jsonwebtoken');
 require('dotenv').config();
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || 'animabingwatch-secret-key-2024';
 
 if (!JWT_SECRET) {
   console.error('❌ JWT_SECRET missing in environment variables');
-  process.exit(1);
+  console.log('💡 Please add JWT_SECRET to your .env file');
 }
 
 module.exports = function adminAuth(req, res, next) {
@@ -40,9 +40,10 @@ module.exports = function adminAuth(req, res, next) {
     }
     
     req.admin = decoded;
+    console.log(`✅ Admin authenticated: ${decoded.username} (ID: ${decoded.id})`);
     next();
   } catch (err) {
-    console.error('Auth error:', err.message);
+    console.error('❌ Auth error:', err.message);
     
     if (err.name === 'TokenExpiredError') {
       return res.status(401).json({ 
