@@ -1,9 +1,9 @@
- // components/ReportButton.tsx - ENHANCED VERSION
+  // components/ReportButton.tsx - ENHANCED VERSION
 import React, { useState } from 'react';
 import axios from 'axios';
 import { createPortal } from "react-dom";
 
-const API_BASE = 'https://animabing.onrender.com/api';
+const API_BASE = 'https://animabingwatch.onrender.com/api';
 
 interface ReportButtonProps {
   animeId: string;
