@@ -1,4 +1,4 @@
-  // src/components/admin/AdminDashboard.tsx - UPDATED WITH ENHANCED UI
+ // src/components/admin/AdminDashboard.tsx - COMPLETE FIXED VERSION
 import React, { useState, useEffect } from 'react';
 import AnimeListTable from './AnimeListTable';
 import AddAnimeForm from './AddAnimeForm';
@@ -10,7 +10,7 @@ import AdManager from './AdManager';
 import Spinner from '../Spinner';
 import axios from 'axios';
 
-const API_BASE = 'https://animabing.onrender.com/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 interface AdminDashboardProps {
   onLogout?: () => void;
@@ -27,16 +27,27 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     totalEpisodes: 0, 
     todayUsers: 0, 
     totalUsers: 0,
-    totalManga: 0
+    totalManga: 0,
+    totalChapters: 0,
+    totalReports: 0,
+    pendingReports: 0,
+    todayEarnings: 0,
+    totalEarnings: 0,
+    todayPageViews: 0,
+    totalPageViews: 0
   });
-  const [user, setUser] = useState({ username: '', email: '', profileImage: '' });
-  const token = localStorage.getItem('adminToken');
+  const [user, setUser] = useState<{ username: string; email: string } | null>(null);
+  
+  // ✅ FIX: Get token properly
+  const token = localStorage.getItem('adminToken') || localStorage.getItem('token');
 
   useEffect(() => {
+    console.log('🔑 Dashboard mounted, token:', token ? 'Exists' : 'Missing');
+    
     if (!token) {
       setError('No authentication token found. Redirecting to login...');
       setTimeout(() => {
-        window.location.href = '/';
+        window.location.href = '/admin/login';
       }, 2000);
       return;
     }
@@ -48,21 +59,85 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
     setLoading(true);
     setError('');
     try {
-      const { data: userData } = await axios.get(`${API_BASE}/admin/protected/user-info`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setUser(userData);
+      console.log('📡 Loading admin dashboard data...');
+      
+      // ✅ FIX: Use Promise.allSettled to handle each API independently
+      const [userInfoResult, analyticsResult] = await Promise.allSettled([
+        axios.get(`${API_BASE}/admin/protected/user-info`, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }),
+        axios.get(`${API_BASE}/admin/protected/analytics`, {
+          headers: { 
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        })
+      ]);
 
-      const { data: stats } = await axios.get(`${API_BASE}/admin/protected/analytics`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      setAnalytics(stats);
-    } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load dashboard data');
-      if (err.response?.status === 401) {
-        localStorage.removeItem('adminToken');
-        window.location.href = '/';
+      // Handle user info result
+      if (userInfoResult.status === 'fulfilled') {
+        const response = userInfoResult.value;
+        console.log('✅ User data response:', response.data);
+        
+        if (response.data.success) {
+          setUser({
+            username: response.data.username || 'Admin',
+            email: response.data.email || 'admin@animabingwatch.com'
+          });
+        } else {
+          throw new Error(response.data.error || 'Failed to load user info');
+        }
+      } else {
+        throw new Error(userInfoResult.reason.response?.data?.error || 'Failed to load user info');
       }
+
+      // Handle analytics result
+      if (analyticsResult.status === 'fulfilled') {
+        const response = analyticsResult.value;
+        console.log('✅ Analytics data:', response.data);
+        
+        if (response.data.success) {
+          setAnalytics(response.data);
+        } else {
+          console.error('Analytics API error:', response.data.error);
+          // We don't throw here because we can still show the dashboard without analytics
+        }
+      } else {
+        console.error('Analytics API failed:', analyticsResult.reason);
+        // We don't throw here because we can still show the dashboard without analytics
+      }
+
+    } catch (err: any) {
+      console.error('❌ Error loading dashboard:', err);
+      
+      let errorMessage = 'Failed to load dashboard data';
+      
+      if (err.response) {
+        // Server responded with error
+        errorMessage = err.response.data?.error || err.response.data?.message || 'Server error';
+        console.error('Response status:', err.response.status);
+        console.error('Response data:', err.response.data);
+        
+        if (err.response.status === 401) {
+          errorMessage = 'Session expired. Please login again.';
+          localStorage.removeItem('adminToken');
+          localStorage.removeItem('token');
+          setTimeout(() => {
+            window.location.href = '/admin/login';
+          }, 2000);
+        }
+      } else if (err.request) {
+        // Request was made but no response
+        errorMessage = 'No response from server. Check your connection.';
+      } else {
+        // Other errors
+        errorMessage = err.message || 'Unknown error occurred';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -71,6 +146,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
   const handleLogout = () => {
     if (confirm('Are you sure you want to logout?')) {
       localStorage.removeItem('adminToken');
+      localStorage.removeItem('token');
       localStorage.removeItem('adminUsername');
 
       if (onLogout) {
@@ -79,6 +155,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
         window.location.href = '/';
       }
     }
+  };
+
+  const retryLoadData = () => {
+    setError('');
+    loadInitialData();
   };
 
   const tabs = [
@@ -95,29 +176,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 flex flex-col items-center justify-center">
         <Spinner />
+        <p className="mt-4 text-slate-400 text-lg">Loading Admin Dashboard...</p>
+        <p className="text-slate-500 text-sm mt-2">Authenticating with token: {token ? '✓ Present' : '✗ Missing'}</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white p-6">
-        <div className="max-w-4xl mx-auto">
+      <div className="min-h-screen bg-gradient-to-br from-gray-950 via-gray-900 to-gray-950 text-white p-6 flex items-center justify-center">
+        <div className="max-w-2xl w-full">
           <div className="bg-gradient-to-br from-red-500/20 to-red-600/10 border border-red-500/50 backdrop-blur rounded-2xl p-8 text-center shadow-2xl shadow-red-500/10">
-            <h2 className="text-3xl font-bold mb-4 text-red-300">Error</h2>
-            <p className="mb-6 text-red-100">{error}</p>
-            <button
-              onClick={loadInitialData}
-              className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white px-8 py-3 rounded-lg transition transform hover:scale-105 font-semibold shadow-lg"
-            >
-              Retry
-            </button>
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <span className="text-2xl">⚠️</span>
+            </div>
+            <h2 className="text-3xl font-bold mb-4 text-red-300">Dashboard Error</h2>
+            <p className="mb-4 text-red-100 bg-red-900/30 p-3 rounded-lg">{error}</p>
+            <p className="mb-6 text-slate-400 text-sm">
+              Token Status: <span className={token ? 'text-green-400' : 'text-red-400'}>
+                {token ? '✓ Present' : '✗ Missing'}
+              </span>
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <button
+                onClick={retryLoadData}
+                className="bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 text-white px-6 py-3 rounded-lg transition transform hover:scale-105 font-semibold shadow-lg flex items-center justify-center gap-2"
+              >
+                <span>🔄</span> Retry Loading
+              </button>
+              <button
+                onClick={() => window.location.href = '/admin/login'}
+                className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-500 hover:to-blue-600 text-white px-6 py-3 rounded-lg transition transform hover:scale-105 font-semibold shadow-lg flex items-center justify-center gap-2"
+              >
+                <span>🔑</span> Go to Login
+              </button>
+            </div>
+            <p className="mt-6 text-slate-500 text-sm">
+              If problem persists, check browser console for more details.
+            </p>
           </div>
         </div>
       </div>
     );
+  }
+
+  // If user is null, we should not render the dashboard
+  if (!user) {
+    return null;
   }
 
   return (
@@ -129,7 +236,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
             <div className="w-10 h-10 bg-gradient-to-br from-purple-500 via-pink-500 to-red-500 rounded-xl flex items-center justify-center font-bold text-lg shadow-lg shadow-purple-500/50">
               ⚙️
             </div>
-            {sidebarOpen && <span className="font-bold text-lg bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">AdminPanel</span>}
+            {sidebarOpen && <span className="font-bold text-lg bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Animebingwatch AdminPanel</span>}
           </div>
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -148,11 +255,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="font-semibold text-purple-300 truncate text-sm">{user.username || 'Admin'}</p>
-                <p className="text-xs text-slate-500 truncate">{user.email}</p>
+                <p className="text-xs text-slate-500 truncate">{user.email || 'admin@animabingwatch.com'}</p>
               </div>
             </div>
             <div className="mt-3 pt-3 border-t border-purple-500/20">
               <p className="text-xs text-slate-400 font-semibold">👑 Admin Access</p>
+              <p className="text-xs text-slate-500">Session: Active</p>
             </div>
           </div>
         )}
@@ -181,9 +289,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
           <div className="mt-8 pt-6 border-t border-slate-700/30">
             <button
               onClick={handleLogout}
-              className="w-full bg-gradient-to-r from-red-600/40 to-red-700/40 hover:from-red-600/60 hover:to-red-700/60 text-red-200 px-4 py-2.5 rounded-lg transition font-semibold text-sm border border-red-500/40 shadow-lg"
+              className="w-full bg-gradient-to-r from-red-600/40 to-red-700/40 hover:from-red-600/60 hover:to-red-700/60 text-red-200 px-4 py-2.5 rounded-lg transition font-semibold text-sm border border-red-500/40 shadow-lg flex items-center justify-center gap-2"
             >
-              🚪 Logout
+              <span>🚪</span> Logout
             </button>
           </div>
         )}
@@ -210,13 +318,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
               <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-red-400 bg-clip-text text-transparent">
                 {tabs.find(t => t.id === activeTab)?.label}
               </h1>
-              <p className="text-sm text-slate-400 mt-2">Manage your content efficiently • Welcome back, <span className="text-purple-300 font-semibold">{user.username || 'Admin'}</span>! 👋</p>
+              <p className="text-sm text-slate-400 mt-2">
+                Manage your content efficiently • Welcome back Harsh Rathore, 
+                <span className="text-purple-300 font-semibold ml-1">{user.username || 'Admin'}</span>! 
+              </p>
             </div>
             <button
               onClick={loadInitialData}
-              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-6 py-2.5 rounded-lg transition transform hover:scale-105 font-semibold shadow-lg shadow-purple-500/30 whitespace-nowrap"
+              className="bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white px-6 py-2.5 rounded-lg transition transform hover:scale-105 font-semibold shadow-lg shadow-purple-500/30 whitespace-nowrap flex items-center gap-2"
             >
-              ↻ Refresh
+              <span>↻</span> Refresh
             </button>
           </div>
 
@@ -257,7 +368,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ onLogout }) => {
 
           {/* Footer */}
           <footer className="mt-6 p-5 bg-gradient-to-r from-slate-800/40 via-slate-800/20 to-slate-700/40 rounded-xl text-center text-sm text-slate-400 border border-slate-700/40 backdrop-blur-sm shadow-lg">
-            <p className="text-slate-500">Status: <span className="text-green-400 font-semibold">● Online</span> • Last Updated: {new Date().toLocaleTimeString()}</p>
+            <p className="text-slate-500">
+              Status: <span className="text-green-400 font-semibold">● Online</span> • 
+              Last Updated: {new Date().toLocaleTimeString()} • 
+              Admin: {user.username}
+            </p>
           </footer>
         </div>
       </div>
