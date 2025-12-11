@@ -1,4 +1,4 @@
-  // components/Footer.tsx - EXACT REAL INSTAGRAM LOGO
+   // components/Footer.tsx - EXACT REAL INSTAGRAM LOGO
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -64,21 +64,21 @@ const Footer: React.FC = () => {
     setSocialLinks([
       {
         platform: 'facebook',
-        url: 'https://facebook.com/animebing',
+        url: 'https://facebook.com/animebingwatch',
         isActive: true,
         icon: 'facebook',
         displayName: 'Facebook'
       },
       {
         platform: 'instagram',
-        url: 'https://instagram.com/animebing',
+        url: 'https://instagram.com/animebingwatch',
         isActive: true,
         icon: 'instagram',
         displayName: 'Instagram'
       },
       {
         platform: 'telegram',
-        url: 'https://t.me/animebing',
+        url: 'https://t.me/animebingwatch',
         isActive: true,
         icon: 'telegram',
         displayName: 'Telegram'
