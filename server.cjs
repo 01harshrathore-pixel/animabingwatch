@@ -1,4 +1,4 @@
-   // server.cjs - COMPLETE FIXED VERSION WITH ACTIVE AD SLOTS ROUTE
+ // server.cjs - COMPLETE FIXED VERSION WITH CORS FIX
 const express = require('express');
 const cors = require('cors');
 const connectDB = require('./db.cjs');
@@ -7,7 +7,7 @@ require('dotenv').config();
 const Analytics = require('./models/Analytics.cjs');
 const { generalLimiter, authLimiter, adminLimiter, apiLimiter } = require('./middleware/rateLimit.cjs');
 
-// ✅ IMPORT MIDDLEWARE AND ROUTES - MOVE TO TOP
+// ✅ IMPORT MIDDLEWARE AND ROUTES
 const adminAuth = require('./middleware/adminAuth.cjs');
 const animeRoutes = require('./routes/animeRoutes.cjs');
 const episodeRoutes = require('./routes/episodeRoutes.cjs');
@@ -21,8 +21,51 @@ const contactRoutes = require('./routes/contactRoutes.cjs');
 
 const app = express();
 
-app.use(cors());
+// ✅ FIXED CORS CONFIGURATION - ALLOW CLOUDFLARE PAGES
+const allowedOrigins = [
+  'https://animabingwatch.pages.dev',
+  'https://*.pages.dev',
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:5000'
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.some(allowedOrigin => {
+      if (allowedOrigin.includes('*')) {
+        const pattern = allowedOrigin.replace('*', '.*');
+        return new RegExp(pattern).test(origin);
+      }
+      return origin === allowedOrigin;
+    })) {
+      callback(null, true);
+    } else {
+      console.log('🚫 CORS Blocked Origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
+};
+
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions)); // Handle preflight
+
+// ✅ REQUEST LOGGING MIDDLEWARE
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} ${req.method} ${req.url}`);
+  console.log('Origin:', req.headers.origin);
+  console.log('User-Agent:', req.headers['user-agent']?.substring(0, 50));
+  next();
+});
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 app.use(express.static('public'));
 
 // Database Connection
@@ -95,7 +138,11 @@ const createAdmin = async () => {
     console.log('3. Check environment variables in .env file');
   }
 };
-createAdmin();
+
+// ✅ DELAY ADMIN CREATION TO ENSURE DB CONNECTION
+setTimeout(() => {
+  createAdmin();
+}, 2000);
 
 // ✅ EMERGENCY ADMIN RESET ROUTE
 app.get('/api/admin/emergency-reset', async (req, res) => {
@@ -368,7 +415,7 @@ app.get('/api/app-downloads', async (req, res) => {
   }
 });
 
-// ✅ EPISODES BY ANIME ID ROUTE - ADDED
+// ✅ EPISODES BY ANIME ID ROUTE
 app.get('/api/episodes/:animeId', async (req, res) => {
   try {
     const { animeId } = req.params;
@@ -385,9 +432,7 @@ app.get('/api/episodes/:animeId', async (req, res) => {
   }
 });
 
-// ============================================
-// ✅ ADDED: PUBLIC ACTIVE AD SLOTS API ROUTE
-// ============================================
+// ✅ PUBLIC ACTIVE AD SLOTS API ROUTE
 app.get('/api/ad-slots/active', async (req, res) => {
   try {
     console.log('📢 Fetching active ad slots...');
@@ -397,7 +442,6 @@ app.get('/api/ad-slots/active', async (req, res) => {
     
     console.log(`✅ Found ${activeAdSlots.length} active ad slots`);
     
-    // If no active slots, return empty array (not error)
     res.json(activeAdSlots);
     
   } catch (error) {
@@ -427,7 +471,7 @@ app.use('/api/ads', adRoutes);
 app.use('/api', contactRoutes);
 
 // ============================================
-// ✅ DEBUG ROUTES (KEEP FOR TROUBLESHOOTING)
+// ✅ DEBUG ROUTES
 // ============================================
 app.get('/api/debug/episodes', async (req, res) => {
   try {
@@ -531,7 +575,25 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     message: 'Animabing Server Running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    apiBase: process.env.VITE_API_BASE || 'Not set'
+  });
+});
+
+// ✅ TEST API ENDPOINTS ROUTE
+app.get('/api/test-endpoints', (req, res) => {
+  const baseUrl = `${req.protocol}://${req.get('host')}`;
+  res.json({
+    endpoints: {
+      featuredAnime: `${baseUrl}/api/anime/featured`,
+      paginatedAnime: `${baseUrl}/api/anime?page=1&limit=24`,
+      searchAnime: `${baseUrl}/api/anime/search?query=naruto`,
+      animeById: `${baseUrl}/api/anime/:id`,
+      episodesByAnimeId: `${baseUrl}/api/episodes/:animeId`,
+      healthCheck: `${baseUrl}/api/health`,
+      activeAdSlots: `${baseUrl}/api/ad-slots/active`
+    }
   });
 });
 
@@ -573,94 +635,54 @@ app.get('/api/emergency/set-all-featured', async (req, res) => {
 });
 
 // ============================================
-// ✅ ROOT ROUTE
+// ✅ CATCH-ALL ROUTE FOR UNHANDLED REQUESTS
 // ============================================
-app.get('/', (req, res) => {
-  res.send(`
-    <!DOCTYPE html>
-    <html lang="en">
-    <head>
-      <meta charset="UTF-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-      <title>Animabing - Anime & Movies</title>
-      <style>
-        body {
-          background: #0a0c1c;
-          color: white;
-          font-family: Arial, sans-serif;
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          margin: 0;
-        }
-        .container {
-          text-align: center;
-          padding: 2rem;
-        }
-        h1 {
-          color: #8B5CF6;
-          margin-bottom: 1rem;
-        }
-        a {
-          color: #8B5CF6;
-          text-decoration: none;
-          font-weight: bold;
-          margin: 0 10px;
-        }
-        a:hover {
-          text-decoration: underline;
-        }
-        .emergency-info {
-          background: #1a1c2c;
-          padding: 1rem;
-          border-radius: 8px;
-          margin: 1rem 0;
-          text-align: left;
-        }
-        .ad-info {
-          background: #2a1c4c;
-          padding: 1rem;
-          border-radius: 8px;
-          margin: 1rem 0;
-          text-align: left;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <h1>Animabing Server</h1>
-        <p>✅ Backend API is running correctly</p>
-        <p>📺 Frontend: <a href="https://rainbow-sfogliatella-b724c0.netlify.app" target="_blank">Netlify</a></p>
-        <p>⚙️ Admin Access: Press Ctrl+Shift+Alt on the frontend</p>
-        
-        <div class="ad-info">
-          <h3>📢 Ad Management:</h3>
-          <p>Active Ad Slots: <a href="/api/ad-slots/active" target="_blank">Check Active Ads</a></p>
-          <p>All Ad Slots: <a href="/api/debug/ad-slots" target="_blank">Debug Ad Slots</a></p>
-          <p>Admin Panel: <a href="/admin" target="_blank">Go to Admin</a></p>
-        </div>
-        
-        <div class="emergency-info">
-          <h3>🔧 Emergency Featured Fix:</h3>
-          <p>Click below to set all anime as featured:</p>
-          <p><a href="/api/emergency/set-all-featured" target="_blank">Set All Anime as Featured</a></p>
-        </div>
-        
-        <p><a href="/api/health">Health Check</a> | <a href="/api/anime/featured">Check Featured</a></p>
-      </div>
-    </body>
-    </html>
-  `);
+app.use('*', (req, res) => {
+  console.log(`❌ Route not found: ${req.method} ${req.originalUrl}`);
+  res.status(404).json({
+    success: false,
+    error: `Route ${req.method} ${req.originalUrl} not found`,
+    availableRoutes: [
+      'GET /api/health',
+      'GET /api/anime/featured',
+      'GET /api/anime?page=1&limit=24',
+      'GET /api/anime/search?query=...',
+      'GET /api/anime/:id',
+      'GET /api/episodes/:animeId',
+      'GET /api/ad-slots/active',
+      'GET /api/test-endpoints'
+    ]
+  });
 });
 
 // ✅ START SERVER
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`🔧 Admin: ${process.env.ADMIN_USER} / ${process.env.ADMIN_PASS}`);
-  console.log(`🌐 Frontend: https:// animabingwatch.page.dev`);
-  console.log(`🔗 API: https:// https://animabingwatch-y20k.onrender.com/api`);
-  console.log(`📢 Active Ad Slots: https:// https://animabingwatch-y20k.onrender.com/api/ad-slots/active`);
-  console.log(`🆕 Emergency Route: https:// https://animabingwatch-y20k.onrender.com/api/emergency/set-all-featured`);
+  console.log(`
+===========================================
+🚀 Animabing Server Started Successfully!
+===========================================
+📡 Server running on port: ${PORT}
+🌐 Local URL: http://localhost:${PORT}
+🔗 API Base URL: https://animabingwatch-y20k.onrender.com
+🔧 Admin: ${process.env.ADMIN_USER || 'Hellobrother'}
+🔑 Password: ${process.env.ADMIN_PASS ? '••••••••' : 'Anime2121818144'}
+
+✅ Available Routes:
+   - GET  /api/health              - Health check
+   - GET  /api/anime/featured      - Featured anime
+   - GET  /api/anime?page=1&limit=24 - Paginated anime
+   - GET  /api/anime/search?query=... - Search anime
+   - GET  /api/anime/:id           - Get anime by ID
+   - GET  /api/episodes/:animeId   - Get episodes by anime ID
+   - GET  /api/ad-slots/active     - Active ad slots
+   - GET  /api/test-endpoints      - Test all endpoints
+   - POST /api/admin/login         - Admin login
+
+📢 For debugging:
+   - GET  /api/debug/animes        - List all anime
+   - GET  /api/debug/ad-slots      - List all ad slots
+   - GET  /api/debug/episodes      - List all episodes
+===========================================
+`);
 });
