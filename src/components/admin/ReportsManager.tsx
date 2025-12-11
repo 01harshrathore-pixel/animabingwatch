@@ -5,7 +5,6 @@ import Spinner from '../Spinner';
 
 interface Report {
   _id: string;
-  // Episode Report Fields
   animeId?: {
     _id: string;
     title: string;
@@ -15,14 +14,10 @@ interface Report {
   episodeNumber?: number;
   issueType?: string;
   description?: string;
-  
-  // Contact Form Fields
   name?: string;
   email: string;
   subject?: string;
   message: string;
-  
-  // Common Fields
   type: 'episode' | 'contact';
   username: string;
   status: 'Pending' | 'In Progress' | 'Fixed' | 'Invalid';
@@ -38,7 +33,6 @@ interface Report {
 }
 
 const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:3000/api';
-const token = localStorage.getItem('adminToken') || '';
 
 const ReportsManager: React.FC = () => {
   const [reports, setReports] = useState<Report[]>([]);
@@ -60,12 +54,80 @@ const ReportsManager: React.FC = () => {
     setLoading(true);
     setError('');
     try {
-      const { data } = await axios.get(`${API_BASE}/admin/protected/reports`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const token = localStorage.getItem('adminToken') || '';
+      
+      if (!token) {
+        throw new Error('Admin token not found. Please login again.');
+      }
+      
+      console.log('📡 Fetching reports...');
+      
+      const response = await fetch(`${API_BASE}/admin/protected/reports`, {
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
-      setReports(data);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      console.log('📋 Reports API Response:', data);
+      
+      // ✅ FIX: Handle both response formats
+      let reportsData = [];
+      
+      if (Array.isArray(data)) {
+        // Direct array response
+        reportsData = data;
+      } else if (data && data.success && Array.isArray(data.data)) {
+        // { success: true, data: [...] } format
+        reportsData = data.data;
+      } else if (data && Array.isArray(data)) {
+        // Just in case
+        reportsData = data;
+      } else {
+        console.warn('⚠️ Unexpected response format, defaulting to empty array');
+        reportsData = [];
+      }
+      
+      console.log(`✅ Loaded ${reportsData.length} reports`);
+      setReports(reportsData);
+      
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Failed to load reports');
+      console.error('❌ Error fetching reports:', err);
+      console.error('❌ Full error:', err);
+      
+      // Try fallback endpoint
+      try {
+        console.log('🔄 Trying fallback endpoint...');
+        const token = localStorage.getItem('adminToken') || '';
+        
+        const fallbackResponse = await fetch(`${API_BASE}/reports`, {
+          headers: { 
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          
+          if (Array.isArray(fallbackData)) {
+            setReports(fallbackData);
+          } else {
+            setReports([]);
+          }
+        } else {
+          setReports([]);
+        }
+      } catch (fallbackErr) {
+        console.error('❌ Fallback also failed:', fallbackErr);
+        setError('Failed to load reports. Please check your connection.');
+        setReports([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -75,10 +137,20 @@ const ReportsManager: React.FC = () => {
   const handleDeleteReport = async (reportId: string) => {
     try {
       console.log('🗑️ Deleting report:', reportId);
+      const token = localStorage.getItem('adminToken') || '';
       
-      await axios.delete(`${API_BASE}/admin/protected/reports/${reportId}`, {
-        headers: { Authorization: `Bearer ${token}` }
+      const response = await fetch(`${API_BASE}/admin/protected/reports/${reportId}`, {
+        method: 'DELETE',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete report');
+      }
 
       setDeleteConfirm({ show: false, report: null });
       fetchReports();
@@ -86,8 +158,7 @@ const ReportsManager: React.FC = () => {
       alert('✅ Report deleted successfully!');
     } catch (err: any) {
       console.error('❌ Delete report error:', err);
-      const errorMessage = err.response?.data?.error || 'Failed to delete report';
-      alert(`❌ ${errorMessage}`);
+      alert(`❌ ${err.message}`);
     }
   };
 
@@ -103,16 +174,28 @@ const ReportsManager: React.FC = () => {
     }
 
     try {
-      await axios.post(`${API_BASE}/admin/protected/reports/bulk-delete`, 
-        { reportIds: selectedReports },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const token = localStorage.getItem('adminToken') || '';
+      
+      const response = await fetch(`${API_BASE}/admin/protected/reports/bulk-delete`, {
+        method: 'POST',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ reportIds: selectedReports })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete reports');
+      }
       
       setBulkDeleteMode(false);
       setSelectedReports([]);
       fetchReports();
+      
+      alert(`✅ ${selectedReports.length} reports deleted successfully!`);
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to delete reports');
+      alert(err.message || 'Failed to delete reports');
     }
   };
 
@@ -136,27 +219,39 @@ const ReportsManager: React.FC = () => {
 
   const updateReportStatus = async (reportId: string, status: Report['status'], response?: string) => {
     try {
+      const token = localStorage.getItem('adminToken') || '';
       const updateData: any = { status };
       
       if (response && status === 'Fixed') {
         updateData.adminResponse = response;
-        updateData.responseDate = new Date();
+        updateData.responseDate = new Date().toISOString();
       }
       
       if (status === 'Fixed') {
-        updateData.resolvedAt = new Date();
+        updateData.resolvedAt = new Date().toISOString();
       }
 
-      await axios.put(`${API_BASE}/admin/protected/reports/${reportId}`,
-        updateData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const fetchResponse = await fetch(`${API_BASE}/admin/protected/reports/${reportId}`, {
+        method: 'PUT',
+        headers: { 
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updateData)
+      });
+
+      if (!fetchResponse.ok) {
+        const errorData = await fetchResponse.json();
+        throw new Error(errorData.error || 'Failed to update report');
+      }
 
       setSelectedReport(null);
       setAdminResponse('');
       fetchReports();
+      
+      alert('✅ Report status updated!');
     } catch (err: any) {
-      alert(err.response?.data?.error || 'Failed to update report');
+      alert(err.message || 'Failed to update report');
     }
   };
 
@@ -189,10 +284,13 @@ const ReportsManager: React.FC = () => {
     }
   };
 
-  const filteredReports = reports.filter(report =>
-    (statusFilter === 'All' || report.status === statusFilter) &&
-    (typeFilter === 'All' || report.type === typeFilter)
-  );
+  // ✅ FIX: Ensure reports is always array before filtering
+  const filteredReports = Array.isArray(reports) 
+    ? reports.filter(report =>
+        (statusFilter === 'All' || report.status === statusFilter) &&
+        (typeFilter === 'All' || report.type === typeFilter)
+      )
+    : [];
 
   if (loading) return <div className="flex justify-center py-8"><Spinner size="lg" /></div>;
   if (error) return <p className="text-red-400 text-center p-4">{error}</p>;
@@ -440,7 +538,6 @@ const ReportsManager: React.FC = () => {
             <table className="w-full">
               <thead className="bg-slate-700/50">
                 <tr>
-                  {/* Checkbox for Bulk Delete */}
                   {bulkDeleteMode && (
                     <th className="p-4 text-left text-slate-300 font-medium">
                       <input
@@ -464,7 +561,6 @@ const ReportsManager: React.FC = () => {
               <tbody className="divide-y divide-slate-700">
                 {filteredReports.map(report => (
                   <tr key={report._id} className="hover:bg-slate-700/30 transition-colors">
-                    {/* Checkbox for each report */}
                     {bulkDeleteMode && (
                       <td className="p-4">
                         <input
@@ -476,14 +572,12 @@ const ReportsManager: React.FC = () => {
                       </td>
                     )}
                     
-                    {/* Type */}
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${getTypeColor(report.type)}`}>
                         {report.type === 'contact' ? 'Contact Form' : 'Episode Report'}
                       </span>
                     </td>
 
-                    {/* Details */}
                     <td className="p-4">
                       {report.type === 'episode' ? (
                         <div className="flex items-center gap-3">
@@ -513,7 +607,6 @@ const ReportsManager: React.FC = () => {
                       )}
                     </td>
 
-                    {/* User Contact */}
                     <td className="p-4">
                       <div className="text-sm">
                         <div className="text-white font-medium">
@@ -528,7 +621,6 @@ const ReportsManager: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* Issue/Subject */}
                     <td className="p-4">
                       {report.type === 'episode' ? (
                         <span className={`px-2 py-1 rounded text-xs font-semibold ${getIssueTypeColor(report.issueType || 'Other')}`}>
@@ -541,7 +633,6 @@ const ReportsManager: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Message */}
                     <td className="p-4 text-slate-300 text-sm max-w-xs">
                       {report.type === 'episode' ? report.description : report.message}
                       {report.adminResponse && (
@@ -552,19 +643,16 @@ const ReportsManager: React.FC = () => {
                       )}
                     </td>
 
-                    {/* Status */}
                     <td className="p-4">
                       <span className={`px-2 py-1 rounded text-xs font-semibold ${getStatusColor(report.status)}`}>
                         {report.status}
                       </span>
                     </td>
 
-                    {/* Date */}
                     <td className="p-4 text-slate-400 text-sm">
                       {new Date(report.createdAt).toLocaleDateString()}
                     </td>
 
-                    {/* Actions */}
                     <td className="p-4">
                       <div className="flex flex-col gap-2">
                         <button
